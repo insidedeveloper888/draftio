@@ -55,19 +55,31 @@ export class GeminiService {
         });
       }
 
+      // Inject current date/time into system instruction
+      const currentDate = new Date();
+      const dateContext = `
+CURRENT DATE/TIME CONTEXT:
+- Today's Date: ${currentDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+- Current Year: ${currentDate.getFullYear()}
+- Current Quarter: Q${Math.ceil((currentDate.getMonth() + 1) / 3)}
+- When creating Gantt charts or timelines, use dates starting from ${currentDate.toISOString().split('T')[0]} or later.
+- All project planning should assume work begins from the current date.
+`;
+      const systemInstructionWithDate = SYSTEM_INSTRUCTION + dateContext;
+
       const response = await this.ai.models.generateContent({
         model,
         contents: [
           ...history.map(h => ({
             role: h.role === 'user' ? ('user' as const) : ('model' as const),
-            parts: h.attachment 
+            parts: h.attachment
               ? [{ text: h.content }, { inlineData: { data: h.attachment.data, mimeType: h.attachment.mimeType } }]
               : [{ text: h.content }]
           })),
           { role: 'user', parts: currentParts }
         ],
         config: {
-          systemInstruction: SYSTEM_INSTRUCTION,
+          systemInstruction: systemInstructionWithDate,
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,

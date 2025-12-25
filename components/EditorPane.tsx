@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { FileText, Code, RotateCcw, Copy, Check, ListChecks } from 'lucide-react';
 import { TabType } from '../types';
-import MermaidRenderer from './MermaidRenderer';
+import MarkdownRenderer from './MarkdownRenderer';
 
 interface EditorPaneProps {
   functional: string;
@@ -11,9 +11,11 @@ interface EditorPaneProps {
   onUpdateFunctional: (val: string) => void;
   onUpdateTechnical: (val: string) => void;
   onUpdateImplementationPlan: (val: string) => void;
+  isReadOnly: boolean;
+  lockedByName?: string | null;
 }
 
-const EditorPane: React.FC<EditorPaneProps> = ({ functional, technical, implementationPlan, onUpdateFunctional, onUpdateTechnical, onUpdateImplementationPlan }) => {
+const EditorPane: React.FC<EditorPaneProps> = ({ functional, technical, implementationPlan, onUpdateFunctional, onUpdateTechnical, onUpdateImplementationPlan, isReadOnly, lockedByName }) => {
   const [activeTab, setActiveTab] = useState<TabType>(TabType.FUNCTIONAL);
   const [isPreview, setIsPreview] = useState(true);
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied'>('idle');
@@ -23,21 +25,6 @@ const EditorPane: React.FC<EditorPaneProps> = ({ functional, technical, implemen
     navigator.clipboard.writeText(content);
     setCopyStatus('copied');
     setTimeout(() => setCopyStatus('idle'), 2000);
-  };
-
-  const renderContent = (content: string) => {
-    if (!content) return null;
-    const parts = content.split(/```mermaid([\s\S]*?)```/);
-    return parts.map((part, index) => {
-      if (index % 2 === 1) {
-        return <MermaidRenderer key={index} chart={part.trim()} />;
-      }
-      return (
-        <div key={index} className="prose prose-slate max-w-none prose-sm whitespace-pre-wrap leading-relaxed">
-          {part}
-        </div>
-      );
-    });
   };
 
   return (
@@ -92,9 +79,12 @@ const EditorPane: React.FC<EditorPaneProps> = ({ functional, technical, implemen
             {copyStatus === 'copied' ? 'Copied' : 'Copy'}
           </button>
           <button
-            onClick={() => setIsPreview(!isPreview)}
+            onClick={() => !isReadOnly && setIsPreview(!isPreview)}
+            disabled={isReadOnly}
             className={`text-xs px-3 py-1.5 rounded-full font-semibold transition-all border shadow-sm ${
-              !isPreview
+              isReadOnly
+                ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                : !isPreview
                 ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
                 : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
             }`}
@@ -110,45 +100,60 @@ const EditorPane: React.FC<EditorPaneProps> = ({ functional, technical, implemen
 
       {/* Editor/Viewer Body */}
       <div className="flex-1 overflow-hidden relative bg-slate-50/30">
-        <div className="h-full overflow-y-auto p-8 max-w-4xl mx-auto w-full">
-          <div className="bg-white min-h-full rounded-xl border border-slate-200 shadow-sm p-8 lg:p-12">
+        <div className="h-full overflow-y-auto p-4 lg:p-6 max-w-6xl mx-auto w-full">
+          <div className="bg-white min-h-full rounded-xl border border-slate-200 shadow-sm p-6 lg:p-8">
             {activeTab === TabType.FUNCTIONAL ? (
               isPreview ? (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  {functional ? renderContent(functional) : <EmptyState text="No functional documentation generated yet." />}
+                  {functional ? <MarkdownRenderer content={functional} /> : <EmptyState text="No functional documentation generated yet." />}
                 </div>
               ) : (
                 <textarea
                   value={functional}
-                  onChange={(e) => onUpdateFunctional(e.target.value)}
-                  className="w-full h-full min-h-[500px] text-sm font-mono p-4 border border-slate-100 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:outline-none resize-none bg-slate-50/50"
-                  placeholder="Type functional requirements here..."
+                  onChange={(e) => !isReadOnly && onUpdateFunctional(e.target.value)}
+                  disabled={isReadOnly}
+                  className={`w-full h-full min-h-[500px] text-sm font-mono p-4 border rounded-lg focus:outline-none resize-none ${
+                    isReadOnly
+                      ? 'bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed'
+                      : 'bg-slate-50/50 border-slate-100 focus:ring-2 focus:ring-indigo-500/20'
+                  }`}
+                  placeholder={isReadOnly ? `🔒 Locked by ${lockedByName}` : "Type functional requirements here..."}
                 />
               )
             ) : activeTab === TabType.TECHNICAL ? (
               isPreview ? (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  {technical ? renderContent(technical) : <EmptyState text="No technical documentation generated yet." />}
+                  {technical ? <MarkdownRenderer content={technical} /> : <EmptyState text="No technical documentation generated yet." />}
                 </div>
               ) : (
                 <textarea
                   value={technical}
-                  onChange={(e) => onUpdateTechnical(e.target.value)}
-                  className="w-full h-full min-h-[500px] text-sm font-mono p-4 border border-slate-100 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:outline-none resize-none bg-slate-50/50"
-                  placeholder="Type technical requirements here (SQL, Endpoints, Mermaid)..."
+                  onChange={(e) => !isReadOnly && onUpdateTechnical(e.target.value)}
+                  disabled={isReadOnly}
+                  className={`w-full h-full min-h-[500px] text-sm font-mono p-4 border rounded-lg focus:outline-none resize-none ${
+                    isReadOnly
+                      ? 'bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed'
+                      : 'bg-slate-50/50 border-slate-100 focus:ring-2 focus:ring-indigo-500/20'
+                  }`}
+                  placeholder={isReadOnly ? `🔒 Locked by ${lockedByName}` : "Type technical requirements here (SQL, Endpoints, Mermaid)..."}
                 />
               )
             ) : (
               isPreview ? (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  {implementationPlan ? renderContent(implementationPlan) : <EmptyState text="No implementation plan generated yet." />}
+                  {implementationPlan ? <MarkdownRenderer content={implementationPlan} /> : <EmptyState text="No implementation plan generated yet." />}
                 </div>
               ) : (
                 <textarea
                   value={implementationPlan}
-                  onChange={(e) => onUpdateImplementationPlan(e.target.value)}
-                  className="w-full h-full min-h-[500px] text-sm font-mono p-4 border border-slate-100 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:outline-none resize-none bg-slate-50/50"
-                  placeholder="Type implementation plan here (steps, tasks, milestones)..."
+                  onChange={(e) => !isReadOnly && onUpdateImplementationPlan(e.target.value)}
+                  disabled={isReadOnly}
+                  className={`w-full h-full min-h-[500px] text-sm font-mono p-4 border rounded-lg focus:outline-none resize-none ${
+                    isReadOnly
+                      ? 'bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed'
+                      : 'bg-slate-50/50 border-slate-100 focus:ring-2 focus:ring-indigo-500/20'
+                  }`}
+                  placeholder={isReadOnly ? `🔒 Locked by ${lockedByName}` : "Type implementation plan here (steps, tasks, milestones)..."}
                 />
               )
             )}

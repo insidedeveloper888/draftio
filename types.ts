@@ -8,6 +8,8 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   attachment?: Attachment;
+  displayName?: string | null;
+  photoURL?: string | null;
 }
 
 export interface SpecificationResponse {
@@ -29,6 +31,11 @@ export interface SavedProject {
   lastEditedBy?: string;
   lastEditedAvatar?: string | null;
   ownerId?: string;
+  lockedBy: string | null;
+  lockedByName: string | null;
+  lockedByAvatar: string | null;
+  lockedAt: number | null;
+  lastActivityAt: number | null;
 }
 
 export enum TabType {

@@ -2,14 +2,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, User, Bot, Loader2, Sparkles, HelpCircle, Paperclip, X } from 'lucide-react';
 import { Message, Attachment } from '../types';
+import Avatar from './Avatar';
 
 interface ChatPaneProps {
   messages: Message[];
   onSendMessage: (message: string, attachment?: Attachment) => void;
   isLoading: boolean;
+  isReadOnly: boolean;
+  lockedByName?: string | null;
 }
 
-const ChatPane: React.FC<ChatPaneProps> = ({ messages, onSendMessage, isLoading }) => {
+const ChatPane: React.FC<ChatPaneProps> = ({ messages, onSendMessage, isLoading, isReadOnly, lockedByName }) => {
   const [input, setInput] = useState('');
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -21,6 +24,24 @@ const ChatPane: React.FC<ChatPaneProps> = ({ messages, onSendMessage, isLoading 
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Auto-resize textarea based on content
+  const MAX_TEXTAREA_HEIGHT = 160; // Max height in pixels
+
+  const adjustTextareaHeight = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto'; // Reset height to recalculate
+      const newHeight = Math.min(textarea.scrollHeight, MAX_TEXTAREA_HEIGHT);
+      textarea.style.height = `${newHeight}px`;
+      // Enable scroll when content exceeds max height
+      textarea.style.overflowY = textarea.scrollHeight > MAX_TEXTAREA_HEIGHT ? 'auto' : 'hidden';
+    }
+  };
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [input]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -43,6 +64,11 @@ const ChatPane: React.FC<ChatPaneProps> = ({ messages, onSendMessage, isLoading 
       setInput('');
       setPreviewAttachment(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      // Reset textarea height and overflow after sending
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+        textareaRef.current.style.overflowY = 'hidden';
+      }
     }
   };
 
@@ -88,11 +114,18 @@ const ChatPane: React.FC<ChatPaneProps> = ({ messages, onSendMessage, isLoading 
         
         {messages.map((msg, i) => (
           <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
-              msg.role === 'user' ? 'bg-slate-700' : 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'
-            }`}>
-              {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
-            </div>
+            {msg.role === 'user' ? (
+              <Avatar
+                photoURL={msg.photoURL}
+                displayName={msg.displayName}
+                size={7}
+                className="shrink-0"
+              />
+            ) : (
+              <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 bg-indigo-600/20 text-indigo-400 border border-indigo-500/30">
+                <Bot className="w-4 h-4" />
+              </div>
+            )}
             <div className={`flex flex-col gap-1 max-w-[85%] ${msg.role === 'user' ? 'items-end' : ''}`}>
               <div className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${
                 msg.role === 'user' 
@@ -134,34 +167,44 @@ const ChatPane: React.FC<ChatPaneProps> = ({ messages, onSendMessage, isLoading 
             </button>
           </div>
         )}
-        <div className="relative flex items-end gap-2 bg-slate-800 border border-slate-700 rounded-xl p-2 focus-within:border-indigo-500/50 transition-all">
-          <button 
+        <div className={`relative flex items-end gap-2 border rounded-xl p-2 transition-all ${
+          isReadOnly ? 'bg-slate-900 border-slate-700' : 'bg-slate-800 border-slate-700 focus-within:border-indigo-500/50'
+        }`}>
+          <button
             onClick={() => fileInputRef.current?.click()}
-            className="p-2 text-slate-500 hover:text-indigo-400 transition-colors"
+            disabled={isReadOnly}
+            className={`p-2 transition-colors ${
+              isReadOnly ? 'text-slate-700 cursor-not-allowed' : 'text-slate-500 hover:text-indigo-400'
+            }`}
           >
             <Paperclip className="w-5 h-5" />
           </button>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            className="hidden" 
-            onChange={handleFileChange} 
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            onChange={handleFileChange}
             accept="image/*,.pdf,.txt,.doc"
+            disabled={isReadOnly}
           />
           <textarea
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Discuss requirements..."
-            className="flex-1 bg-transparent border-none text-sm text-slate-200 placeholder:text-slate-600 focus:ring-0 py-2 min-h-[40px] max-h-[120px] resize-none overflow-y-auto custom-scrollbar"
+            disabled={isReadOnly}
+            placeholder={isReadOnly ? `🔒 Locked by ${lockedByName}` : "Discuss requirements..."}
+            className={`flex-1 bg-transparent border-none text-sm py-2 min-h-[40px] resize-none focus:outline-none custom-scrollbar ${
+              isReadOnly ? 'text-slate-500 placeholder:text-slate-700 cursor-not-allowed' : 'text-slate-200 placeholder:text-slate-600 focus:ring-0'
+            }`}
             rows={1}
           />
           <button
             onClick={() => handleSubmit()}
-            disabled={(!input.trim() && !previewAttachment) || isLoading}
+            disabled={(!input.trim() && !previewAttachment) || isLoading || isReadOnly}
             className={`p-2 rounded-lg transition-all ${
-              input.trim() || previewAttachment ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-700 text-slate-500'
+              isReadOnly ? 'bg-slate-800 text-slate-700 cursor-not-allowed' :
+              (input.trim() || previewAttachment) ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-700 text-slate-500'
             }`}
           >
             <Send className="w-4 h-4" />
