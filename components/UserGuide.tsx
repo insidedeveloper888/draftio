@@ -8,33 +8,33 @@ interface UserGuideProps {
 
 const UserGuide: React.FC<UserGuideProps> = ({ onClose }) => {
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl max-w-3xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="bg-indigo-600 text-white px-6 py-4 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-              <Sparkle className="w-6 h-6" />
+        <div className="bg-indigo-600 text-white px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/20 rounded-lg sm:rounded-xl flex items-center justify-center">
+              <Sparkle className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <h2 className="text-lg font-bold">Draftio User Guide</h2>
-              <p className="text-indigo-200 text-xs">Learn how to use the AI Requirements Architect</p>
+              <h2 className="text-base sm:text-lg font-bold">Draftio User Guide</h2>
+              <p className="text-indigo-200 text-[10px] sm:text-xs">Learn how to use the AI Requirements Architect</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+            className="p-1.5 sm:p-2 hover:bg-white/20 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 sm:space-y-8">
           {/* Introduction */}
           <section>
-            <h3 className="text-lg font-bold text-slate-800 mb-3">Welcome to Draftio</h3>
-            <p className="text-sm text-slate-600 leading-relaxed">
+            <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-2 sm:mb-3">Welcome to Draftio</h3>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
               Draftio is an AI-powered requirements architect that helps you create professional
               functional specifications, technical specifications, and implementation plans through
               natural conversation. It's designed for teams to collaborate on requirement documents
@@ -44,23 +44,23 @@ const UserGuide: React.FC<UserGuideProps> = ({ onClose }) => {
 
           {/* Getting Started */}
           <section>
-            <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
-              <span className="w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-xs font-bold">1</span>
+            <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-2 sm:mb-3 flex items-center gap-2">
+              <span className="w-5 h-5 sm:w-6 sm:h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold">1</span>
               Getting Started
             </h3>
-            <div className="space-y-3 text-sm text-slate-600">
-              <div className="flex items-start gap-3 bg-slate-50 p-4 rounded-lg">
-                <Users className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+            <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-slate-600">
+              <div className="flex items-start gap-2 sm:gap-3 bg-slate-50 p-3 sm:p-4 rounded-lg">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-semibold text-slate-700">Sign In with Google</p>
-                  <p>Click the "Sign In" button in the header to authenticate with your Google account. This enables cloud sync and collaboration features.</p>
+                  <p>Click "Sign In" in the header to authenticate. This enables cloud sync and collaboration.</p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 bg-slate-50 p-4 rounded-lg">
-                <FolderOpen className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+              <div className="flex items-start gap-2 sm:gap-3 bg-slate-50 p-3 sm:p-4 rounded-lg">
+                <FolderOpen className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-semibold text-slate-700">Workspace Library</p>
-                  <p>The left sidebar shows all projects in the shared workspace. Click any project to load it, or click the <strong>+</strong> button to create a new one.</p>
+                  <p>The sidebar shows all projects. Click any project to load it, or click <strong>+</strong> to create new.</p>
                 </div>
               </div>
             </div>
@@ -68,57 +68,58 @@ const UserGuide: React.FC<UserGuideProps> = ({ onClose }) => {
 
           {/* Editing & Locking */}
           <section>
-            <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
-              <span className="w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-xs font-bold">2</span>
+            <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-2 sm:mb-3 flex items-center gap-2">
+              <span className="w-5 h-5 sm:w-6 sm:h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold">2</span>
               Editing & Locking
             </h3>
-            <div className="space-y-3 text-sm text-slate-600">
-              <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 p-4 rounded-lg">
-                <Lock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-slate-600">
+              <div className="flex items-start gap-2 sm:gap-3 bg-amber-50 border border-amber-200 p-3 sm:p-4 rounded-lg">
+                <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-semibold text-amber-800">Lock Before Editing</p>
-                  <p className="text-amber-700">To prevent conflicts, you must click <strong>"LOCK TO EDIT"</strong> before making changes. This ensures only one person edits at a time.</p>
+                  <p className="text-amber-700">Click <strong>"LOCK TO EDIT"</strong> before making changes. Only one person can edit at a time.</p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-200 p-4 rounded-lg">
-                <Unlock className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="flex items-start gap-2 sm:gap-3 bg-emerald-50 border border-emerald-200 p-3 sm:p-4 rounded-lg">
+                <Unlock className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-semibold text-emerald-800">Release the Lock</p>
-                  <p className="text-emerald-700">Click <strong>"UNLOCK"</strong> when you're done editing. The lock also auto-releases after 15 minutes of inactivity.</p>
+                  <p className="text-emerald-700">Click <strong>"UNLOCK"</strong> when done. Auto-releases after 15 min idle.</p>
                 </div>
               </div>
-              <p className="text-slate-500 text-xs italic">
-                Note: If someone else has the lock, you'll see a read-only banner and can still view real-time updates.
+              <p className="text-slate-500 text-[10px] sm:text-xs italic">
+                Note: If someone else has the lock, you'll see a read-only banner.
               </p>
             </div>
           </section>
 
           {/* Chatting with AI */}
           <section>
-            <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
-              <span className="w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-xs font-bold">3</span>
-              Chatting with the AI Architect
+            <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-2 sm:mb-3 flex items-center gap-2">
+              <span className="w-5 h-5 sm:w-6 sm:h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold">3</span>
+              <span className="hidden sm:inline">Chatting with the AI Architect</span>
+              <span className="sm:hidden">AI Chat</span>
             </h3>
-            <div className="space-y-3 text-sm text-slate-600">
-              <div className="flex items-start gap-3 bg-slate-50 p-4 rounded-lg">
-                <MessageSquare className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+            <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-slate-600">
+              <div className="flex items-start gap-2 sm:gap-3 bg-slate-50 p-3 sm:p-4 rounded-lg">
+                <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold text-slate-700">Describe Your Requirements</p>
-                  <p>Use the chat panel on the left to describe your project goals, features, or paste existing requirements. The AI will ask clarifying questions to understand your needs.</p>
+                  <p className="font-semibold text-slate-700">Describe Requirements</p>
+                  <p>Use chat to describe project goals. The AI asks clarifying questions.</p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 bg-slate-50 p-4 rounded-lg">
-                <Paperclip className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+              <div className="flex items-start gap-2 sm:gap-3 bg-slate-50 p-3 sm:p-4 rounded-lg">
+                <Paperclip className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-semibold text-slate-700">Attach Files</p>
-                  <p>Click the paperclip icon to attach images, PDFs, or documents. The AI can analyze these to extract requirements.</p>
+                  <p>Click paperclip to attach images, PDFs, or documents for AI analysis.</p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 bg-slate-50 p-4 rounded-lg">
-                <Bot className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+              <div className="flex items-start gap-2 sm:gap-3 bg-slate-50 p-3 sm:p-4 rounded-lg">
+                <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold text-slate-700">AI Generates Documentation</p>
-                  <p>As you chat, the AI automatically generates and updates the Functional Spec, Technical Spec, and Implementation Plan in real-time.</p>
+                  <p className="font-semibold text-slate-700">Auto-Generated Docs</p>
+                  <p>AI generates specs and plans in real-time as you chat.</p>
                 </div>
               </div>
             </div>
@@ -126,64 +127,64 @@ const UserGuide: React.FC<UserGuideProps> = ({ onClose }) => {
 
           {/* Document Tabs */}
           <section>
-            <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
-              <span className="w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-xs font-bold">4</span>
+            <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-2 sm:mb-3 flex items-center gap-2">
+              <span className="w-5 h-5 sm:w-6 sm:h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold">4</span>
               Document Tabs
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-              <div className="bg-indigo-50 border border-indigo-200 p-4 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 text-xs sm:text-sm">
+              <div className="bg-indigo-50 border border-indigo-200 p-3 sm:p-4 rounded-lg">
+                <div className="flex items-center gap-2 mb-1 sm:mb-2">
                   <FileText className="w-4 h-4 text-indigo-600" />
-                  <p className="font-semibold text-indigo-800">Functional Spec</p>
+                  <p className="font-semibold text-indigo-800">Functional</p>
                 </div>
-                <p className="text-indigo-700 text-xs">Business requirements, user stories, features, and acceptance criteria.</p>
+                <p className="text-indigo-700 text-[10px] sm:text-xs">Business requirements, user stories, features.</p>
               </div>
-              <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
+              <div className="bg-emerald-50 border border-emerald-200 p-3 sm:p-4 rounded-lg">
+                <div className="flex items-center gap-2 mb-1 sm:mb-2">
                   <Code className="w-4 h-4 text-emerald-600" />
-                  <p className="font-semibold text-emerald-800">Technical Spec</p>
+                  <p className="font-semibold text-emerald-800">Technical</p>
                 </div>
-                <p className="text-emerald-700 text-xs">Architecture, database schemas, API endpoints, and technical decisions.</p>
+                <p className="text-emerald-700 text-[10px] sm:text-xs">Architecture, schemas, API endpoints.</p>
               </div>
-              <div className="bg-purple-50 border border-purple-200 p-4 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
+              <div className="bg-purple-50 border border-purple-200 p-3 sm:p-4 rounded-lg">
+                <div className="flex items-center gap-2 mb-1 sm:mb-2">
                   <ListChecks className="w-4 h-4 text-purple-600" />
-                  <p className="font-semibold text-purple-800">Implementation Plan</p>
+                  <p className="font-semibold text-purple-800">Plan</p>
                 </div>
-                <p className="text-purple-700 text-xs">Step-by-step tasks, phases, and milestones for development.</p>
+                <p className="text-purple-700 text-[10px] sm:text-xs">Tasks, phases, and milestones.</p>
               </div>
             </div>
-            <p className="text-slate-500 text-xs mt-3">
-              Toggle between <strong>Preview</strong> and <strong>Edit</strong> mode using the button in the tab header.
+            <p className="text-slate-500 text-[10px] sm:text-xs mt-2 sm:mt-3">
+              Toggle between <strong>Preview</strong> and <strong>Edit</strong> mode in the tab header.
             </p>
           </section>
 
           {/* Visual Diagrams */}
           <section>
-            <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
-              <span className="w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-xs font-bold">5</span>
+            <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-2 sm:mb-3 flex items-center gap-2">
+              <span className="w-5 h-5 sm:w-6 sm:h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold">5</span>
               Visual Diagrams
             </h3>
-            <div className="space-y-3 text-sm text-slate-600">
-              <div className="flex items-start gap-3 bg-slate-50 p-4 rounded-lg">
-                <BarChart3 className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+            <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-slate-600">
+              <div className="flex items-start gap-2 sm:gap-3 bg-slate-50 p-3 sm:p-4 rounded-lg">
+                <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-semibold text-slate-700">Auto-Generated Diagrams</p>
-                  <p>The AI creates visual diagrams including <strong>Gantt Charts</strong>, <strong>Flowcharts</strong>, <strong>ER Diagrams</strong>, <strong>Sequence Diagrams</strong>, <strong>Mind Maps</strong>, <strong>State Diagrams</strong>, and <strong>Timelines</strong>. Each diagram shows a colored label indicating its type.</p>
+                  <p>AI creates Gantt Charts, Flowcharts, ER Diagrams, Sequence Diagrams, Mind Maps, and more.</p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 bg-slate-50 p-4 rounded-lg">
-                <Maximize2 className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+              <div className="flex items-start gap-2 sm:gap-3 bg-slate-50 p-3 sm:p-4 rounded-lg">
+                <Maximize2 className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-semibold text-slate-700">Fullscreen View</p>
-                  <p>Click the <strong>"Expand"</strong> button on any diagram to open it in fullscreen mode. Diagrams automatically fit to your screen for optimal viewing.</p>
+                  <p>Click "Expand" on any diagram for fullscreen viewing.</p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 bg-slate-50 p-4 rounded-lg">
-                <ZoomIn className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+              <div className="flex items-start gap-2 sm:gap-3 bg-slate-50 p-3 sm:p-4 rounded-lg">
+                <ZoomIn className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-semibold text-slate-700">Figma-like Controls</p>
-                  <p>In fullscreen mode: <strong>Ctrl/Cmd + scroll</strong> zooms toward your cursor (up to 1000%). Hold <strong>Space + drag</strong> to pan around. Use the <strong>Reset</strong> button to return to fit view. Press <strong>ESC</strong> to close.</p>
+                  <p><span className="hidden sm:inline">Ctrl/Cmd + scroll to zoom, Space + drag to pan.</span><span className="sm:hidden">Pinch to zoom, drag to pan.</span></p>
                 </div>
               </div>
             </div>
@@ -191,60 +192,57 @@ const UserGuide: React.FC<UserGuideProps> = ({ onClose }) => {
 
           {/* Exporting */}
           <section>
-            <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
-              <span className="w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-xs font-bold">6</span>
-              Exporting Documents
+            <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-2 sm:mb-3 flex items-center gap-2">
+              <span className="w-5 h-5 sm:w-6 sm:h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold">6</span>
+              <span className="hidden sm:inline">Exporting Documents</span>
+              <span className="sm:hidden">Export</span>
             </h3>
-            <div className="flex items-start gap-3 bg-slate-50 p-4 rounded-lg text-sm text-slate-600">
-              <Download className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2 sm:gap-3 bg-slate-50 p-3 sm:p-4 rounded-lg text-xs sm:text-sm text-slate-600">
+              <Download className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500 shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold text-slate-700">Download as Markdown</p>
-                <p>Click the download icon in the header to export any document as a <strong>.md</strong> file. Use these files in your project documentation, wikis, or development tools.</p>
+                <p>Click download icon to export as <strong>.md</strong> files for docs or wikis.</p>
               </div>
             </div>
           </section>
 
           {/* Tips */}
-          <section className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 p-5 rounded-xl">
-            <h3 className="text-lg font-bold text-indigo-800 mb-3">Pro Tips</h3>
-            <ul className="space-y-2 text-sm text-indigo-700">
+          <section className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 p-3 sm:p-5 rounded-xl">
+            <h3 className="text-base sm:text-lg font-bold text-indigo-800 mb-2 sm:mb-3">Pro Tips</h3>
+            <ul className="space-y-1.5 sm:space-y-2 text-[11px] sm:text-sm text-indigo-700">
               <li className="flex items-start gap-2">
                 <span className="text-indigo-400">•</span>
-                <span>Be specific when describing features - the AI will ask follow-up questions if needed.</span>
+                <span>Be specific - the AI will ask follow-up questions if needed.</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-indigo-400">•</span>
-                <span>Use Shift+Enter to add new lines in the chat without sending.</span>
+                <span>Shift+Enter adds new lines without sending.</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-indigo-400">•</span>
-                <span>Click the project name in the header to rename it.</span>
+                <span>Click project name in header to rename.</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-indigo-400">•</span>
-                <span>All changes are auto-saved to the cloud when you have the lock.</span>
+                <span>Auto-saved to cloud when you have the lock.</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-indigo-400">•</span>
-                <span>The AI uses a default tech stack (React, Next.js, Supabase) but you can specify alternatives.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-indigo-400">•</span>
-                <span>Ask the AI to "add a Gantt chart" or "create an ER diagram" to enhance your documentation visually.</span>
+                <span>Default stack: React, Next.js, Supabase (customizable).</span>
               </li>
             </ul>
           </section>
         </div>
 
         {/* Footer */}
-        <div className="border-t border-slate-200 px-6 py-4 bg-slate-50 shrink-0">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-slate-500">
+        <div className="border-t border-slate-200 px-4 sm:px-6 py-3 sm:py-4 bg-slate-50 shrink-0">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] sm:text-xs text-slate-500">
               Draftio v1.0 • Powered by Gemini AI
             </p>
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors"
+              className="px-3 sm:px-4 py-1.5 sm:py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold rounded-lg transition-colors"
             >
               Got it!
             </button>

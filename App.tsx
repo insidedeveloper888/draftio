@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { LogOut, Save, FolderOpen, Plus, Trash2, Clock, Sparkle, Download, FileText, Check, AlertCircle, RefreshCw, Users, Lock, Unlock, BookOpen } from 'lucide-react';
+import { LogOut, Save, FolderOpen, Plus, Trash2, Clock, Sparkle, Download, FileText, Check, AlertCircle, RefreshCw, Users, Lock, Unlock, BookOpen, Menu, X, MessageSquare, FileEdit } from 'lucide-react';
 import ChatPane from './components/ChatPane';
 import EditorPane from './components/EditorPane';
 import Avatar from './components/Avatar';
@@ -27,6 +27,8 @@ const App: React.FC = () => {
   const [showUserGuide, setShowUserGuide] = useState(false);
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
   const [isLibraryOpen, setIsLibraryOpen] = useState(true);
+  const [mobileView, setMobileView] = useState<'chat' | 'editor'>('chat');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [idleTimer, setIdleTimer] = useState<NodeJS.Timeout | null>(null);
   const [myLockTimestamp, setMyLockTimestamp] = useState<number | null>(null); // Track when I locked (for UI re-render)
 
@@ -556,15 +558,25 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <header className="h-14 bg-white border-b flex items-center justify-between px-6 z-40 shadow-sm shrink-0">
-        <div className="flex items-center gap-4">
-          <button onClick={() => setIsLibraryOpen(!isLibraryOpen)} className={`p-2 rounded-lg transition-colors ${isLibraryOpen ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400 hover:text-indigo-600'}`}>
+      <header className="h-14 bg-white border-b flex items-center justify-between px-3 sm:px-6 z-40 shadow-sm shrink-0">
+        <div className="flex items-center gap-2 sm:gap-4">
+          {/* Mobile menu button */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden p-2 rounded-lg transition-colors text-slate-400 hover:text-indigo-600"
+          >
+            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+
+          {/* Desktop library toggle */}
+          <button onClick={() => setIsLibraryOpen(!isLibraryOpen)} className={`hidden md:block p-2 rounded-lg transition-colors ${isLibraryOpen ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400 hover:text-indigo-600'}`}>
             <FolderOpen className="w-5 h-5" />
           </button>
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg"><Sparkle className="w-5 h-5 text-white" /></div>
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg"><Sparkle className="w-4 h-4 sm:w-5 sm:h-5 text-white" /></div>
             <div>
-              <h1 className="text-sm font-black flex items-center gap-2">Draftio <span className="text-[8px] bg-emerald-100 text-emerald-700 px-1 py-0.5 rounded uppercase">Requirements</span></h1>
+              <h1 className="text-xs sm:text-sm font-black flex items-center gap-2">Draftio <span className="hidden sm:inline text-[8px] bg-emerald-100 text-emerald-700 px-1 py-0.5 rounded uppercase">Requirements</span></h1>
               {isEditingName ? (
                 <input
                   type="text"
@@ -574,12 +586,12 @@ const App: React.FC = () => {
                   onKeyDown={handleNameKeyDown}
                   autoFocus
                   maxLength={100}
-                  className="text-[9px] text-indigo-600 font-bold uppercase max-w-[150px] bg-indigo-50 border border-indigo-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="text-[9px] text-indigo-600 font-bold uppercase max-w-[100px] sm:max-w-[150px] bg-indigo-50 border border-indigo-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
               ) : (
                 <p
                   onClick={startEditingName}
-                  className="text-[9px] text-indigo-600 font-bold uppercase truncate max-w-[150px] cursor-pointer hover:bg-indigo-50 hover:px-1 rounded transition-all"
+                  className="text-[9px] text-indigo-600 font-bold uppercase truncate max-w-[80px] sm:max-w-[150px] cursor-pointer hover:bg-indigo-50 hover:px-1 rounded transition-all"
                   title="Click to edit project name"
                 >
                   {projectName}
@@ -588,17 +600,17 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
-        
-        <div className="flex items-center gap-3">
+
+        <div className="flex items-center gap-1 sm:gap-3">
           <button
             onClick={() => setShowUserGuide(true)}
-            className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
+            className="hidden sm:block p-2 text-slate-400 hover:text-indigo-600 transition-colors"
             title="User Guide"
           >
             <BookOpen className="w-5 h-5" />
           </button>
           <div className="relative">
-            <button onClick={() => setShowExportMenu(!showExportMenu)} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Export"><Download className="w-5 h-5" /></button>
+            <button onClick={() => setShowExportMenu(!showExportMenu)} className="hidden sm:block p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Export"><Download className="w-5 h-5" /></button>
             {showExportMenu && (
               <div className="absolute right-0 mt-2 w-52 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-2 animate-in fade-in zoom-in duration-100 origin-top-right">
                 <button onClick={() => exportAsMarkdown('functional')} className="w-full flex items-center gap-3 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"><FileText className="w-4 h-4 text-indigo-500" /> Functional Spec (.md)</button>
@@ -608,19 +620,19 @@ const App: React.FC = () => {
             )}
           </div>
 
-          <div className="w-[1px] h-6 bg-slate-200 mx-1" />
+          <div className="hidden sm:block w-[1px] h-6 bg-slate-200 mx-1" />
 
           {user ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <Avatar photoURL={user.photoURL} displayName={user.displayName} size={7} className="border border-indigo-100" />
-              <button onClick={() => fb.auth && fb.signOut(fb.auth)} className="text-slate-400 hover:text-red-500 transition-colors"><LogOut className="w-4 h-4" /></button>
+              <button onClick={() => fb.auth && fb.signOut(fb.auth)} className="hidden sm:block text-slate-400 hover:text-red-500 transition-colors"><LogOut className="w-4 h-4" /></button>
             </div>
           ) : (
-            <button onClick={handleSignIn} className="text-[10px] font-black uppercase px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">Sign In</button>
+            <button onClick={handleSignIn} className="text-[10px] font-black uppercase px-2 sm:px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">Sign In</button>
           )}
 
           {isLockedByOther ? (
-            <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg">
               <Avatar photoURL={lockInfo.lockedByAvatar} displayName={lockInfo.lockedByName} size={6} />
               <span className="text-xs font-semibold text-amber-700">
                 🔒 {lockInfo.lockedByName} is editing
@@ -629,32 +641,69 @@ const App: React.FC = () => {
           ) : isLockedByMe ? (
             <button
               onClick={unlockProject}
-              className="px-4 py-2 text-xs font-black uppercase rounded-lg transition-all flex items-center gap-2 shadow-md bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="px-2 sm:px-4 py-2 text-[10px] sm:text-xs font-black uppercase rounded-lg transition-all flex items-center gap-1 sm:gap-2 shadow-md bg-emerald-600 hover:bg-emerald-700 text-white"
             >
-              <Unlock className="w-4 h-4" />
-              UNLOCK
+              <Unlock className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">UNLOCK</span>
             </button>
           ) : (
             <button
               onClick={lockProject}
               disabled={!activeProjectId}
-              className={`px-4 py-2 text-xs font-black uppercase rounded-lg transition-all flex items-center gap-2 shadow-md ${
+              className={`px-2 sm:px-4 py-2 text-[10px] sm:text-xs font-black uppercase rounded-lg transition-all flex items-center gap-1 sm:gap-2 shadow-md ${
                 !activeProjectId ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 text-white'
               }`}
             >
-              <Lock className="w-4 h-4" />
-              LOCK TO EDIT
+              <Lock className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">LOCK TO EDIT</span>
             </button>
           )}
         </div>
       </header>
 
-      <div className="flex-1 flex overflow-hidden">
-        <aside className={`bg-slate-800 transition-all duration-300 border-r border-slate-700 overflow-hidden ${isLibraryOpen ? 'w-64' : 'w-0'}`}>
-          <div className="w-64 flex flex-col h-full">
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Mobile Menu Overlay */}
+        {isMobileMenuOpen && (
+          <div
+            className="md:hidden fixed inset-0 bg-black/50 z-40"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
+
+        {/* Sidebar - Desktop: inline, Mobile: overlay */}
+        <aside className={`
+          bg-slate-800 transition-all duration-300 border-r border-slate-700 overflow-hidden z-50
+          ${isMobileMenuOpen ? 'fixed inset-y-0 left-0 w-72 pt-14' : 'hidden'}
+          md:relative md:block md:pt-0
+          ${isLibraryOpen ? 'md:w-64' : 'md:w-0'}
+        `}>
+          <div className="w-72 md:w-64 flex flex-col h-full">
             <div className="p-4 flex justify-between items-center text-slate-400 border-b border-slate-700">
               <div className="flex items-center gap-2"><Users className="w-4 h-4" /><span className="text-[10px] font-black uppercase">Workspace Library</span></div>
               <button onClick={createNewProject} className="p-1 hover:bg-slate-700 rounded transition-colors"><Plus className="w-4 h-4" /></button>
+            </div>
+            {/* Mobile-only menu items */}
+            <div className="md:hidden p-3 border-b border-slate-700 space-y-2">
+              <button
+                onClick={() => { setShowUserGuide(true); setIsMobileMenuOpen(false); }}
+                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-lg"
+              >
+                <BookOpen className="w-4 h-4" /> User Guide
+              </button>
+              <button
+                onClick={() => { setShowExportMenu(true); setIsMobileMenuOpen(false); }}
+                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-lg"
+              >
+                <Download className="w-4 h-4" /> Export
+              </button>
+              {user && (
+                <button
+                  onClick={() => { fb.auth && fb.signOut(fb.auth); setIsMobileMenuOpen(false); }}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-400 hover:bg-slate-700 rounded-lg"
+                >
+                  <LogOut className="w-4 h-4" /> Sign Out
+                </button>
+              )}
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
               {savedProjects.length === 0 ? (
@@ -663,7 +712,11 @@ const App: React.FC = () => {
                 </div>
               ) : (
                 savedProjects.map(p => (
-                  <div key={p.id} onClick={() => loadProject(p)} className={`group p-3 rounded-xl cursor-pointer border transition-all ${activeProjectId === p.id ? 'bg-indigo-600/20 border-indigo-500/40' : 'bg-slate-800/50 border-transparent hover:border-slate-600'}`}>
+                  <div
+                    key={p.id}
+                    onClick={() => { loadProject(p); setIsMobileMenuOpen(false); }}
+                    className={`group p-3 rounded-xl cursor-pointer border transition-all ${activeProjectId === p.id ? 'bg-indigo-600/20 border-indigo-500/40' : 'bg-slate-800/50 border-transparent hover:border-slate-600'}`}
+                  >
                     <div className="flex justify-between items-start mb-1">
                       <h4 className="text-sm font-bold text-slate-200 truncate">{p.projectName}</h4>
                       <button onClick={(e) => deleteProject(p.id, e)} className="opacity-0 group-hover:opacity-100 p-1 text-slate-500 hover:text-red-400"><Trash2 className="w-3 h-3" /></button>
@@ -681,19 +734,49 @@ const App: React.FC = () => {
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Read-only Banner */}
           {isLockedByOther && (
-            <div className="bg-amber-100 border-b border-amber-200 px-6 py-3 flex items-center justify-center gap-3 shrink-0">
-              <AlertCircle className="w-5 h-5 text-amber-700" />
+            <div className="bg-amber-100 border-b border-amber-200 px-3 sm:px-6 py-2 sm:py-3 flex items-center justify-center gap-2 sm:gap-3 shrink-0">
+              <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700" />
               <div className="flex items-center gap-2">
                 <Avatar photoURL={lockInfo.lockedByAvatar} displayName={lockInfo.lockedByName} size={6} />
-                <span className="text-sm font-bold text-amber-800">
-                  You are in READ ONLY mode - 🔒 Locked by {lockInfo.lockedByName}
+                <span className="text-xs sm:text-sm font-bold text-amber-800">
+                  <span className="hidden sm:inline">You are in READ ONLY mode - </span>🔒 Locked by {lockInfo.lockedByName}
                 </span>
               </div>
             </div>
           )}
 
+          {/* Mobile View Toggle */}
+          <div className="md:hidden flex border-b border-slate-200 bg-white shrink-0">
+            <button
+              onClick={() => setMobileView('chat')}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-all border-b-2 ${
+                mobileView === 'chat'
+                  ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50'
+                  : 'border-transparent text-slate-500'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4" />
+              Chat
+            </button>
+            <button
+              onClick={() => setMobileView('editor')}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-all border-b-2 ${
+                mobileView === 'editor'
+                  ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50'
+                  : 'border-transparent text-slate-500'
+              }`}
+            >
+              <FileEdit className="w-4 h-4" />
+              Editor
+            </button>
+          </div>
+
           <div className="flex-1 flex overflow-hidden">
-            <section className="w-[380px] shrink-0 border-r border-slate-800 shadow-xl z-10">
+            {/* Chat Section - Full width on mobile when active, fixed width on desktop */}
+            <section className={`
+              ${mobileView === 'chat' ? 'flex' : 'hidden'}
+              md:flex md:w-[380px] lg:w-[420px] w-full shrink-0 border-r border-slate-800 shadow-xl z-10
+            `}>
               <ChatPane
                 messages={messages}
                 onSendMessage={handleSendMessage}
@@ -702,7 +785,11 @@ const App: React.FC = () => {
                 lockedByName={lockInfo.lockedByName}
               />
             </section>
-            <section className="flex-1 bg-slate-50">
+            {/* Editor Section - Full width on mobile when active, flexible on desktop */}
+            <section className={`
+              ${mobileView === 'editor' ? 'flex' : 'hidden'}
+              md:flex flex-1 bg-slate-50
+            `}>
               <EditorPane
                 functional={functionalSpec}
                 technical={technicalSpec}

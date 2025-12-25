@@ -4,119 +4,90 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Draftio** is an enterprise-grade AI Requirements Architect for Business Analysts. It generates functional and technical specifications in real-time using AI-powered conversations. Built with React 19, Vite, and Google Gemini AI, it features real-time cloud sync with Firebase and Firestore.
-
-View the app in AI Studio: https://ai.studio/apps/drive/1Wbjd4E-euLSMaWhF7rzRvC4SDzHGgLle
+**Draftio** is an AI-powered requirements management platform for Business Analysts. Through conversational AI (Google Gemini), it generates functional specs, technical specs, and implementation plans in real-time. Features collaborative editing with project locking and real-time Firestore sync.
 
 ## Development Commands
 
-### Setup
 ```bash
-npm install
+npm install           # Install dependencies
+npm run dev           # Dev server at http://0.0.0.0:3000
+npm run build         # Production build
+npm run preview       # Preview production build
 ```
 
-### Environment Configuration
-Set the `GEMINI_API_KEY` in `.env.local` with your Gemini API key:
+No lint or test commands are configured.
+
+### Environment
+Create `.env.local` with:
 ```
 GEMINI_API_KEY=your_api_key_here
 ```
 
-### Running the App
-```bash
-npm run dev     # Starts dev server on http://0.0.0.0:3000
-npm run build   # Build for production
-npm run preview # Preview production build
-```
+Vite maps this to `process.env.API_KEY` at build time via `vite.config.ts`.
 
 ## Architecture Overview
 
-### Application Structure
-Draftio follows a flat component structure with clear separation of concerns:
+Flat component structure with all source files in root directory (no `src/` folder). Use `@/` path alias for imports.
 
-- **`App.tsx`** - Main application container managing:
-  - Authentication state (Firebase Auth with Google Sign-In)
-  - Project management (create, load, save, delete)
-  - Real-time Firestore sync for collaborative projects
-  - Local storage fallback when Firebase is unavailable
-  - Chat message history and AI interaction orchestration
+### Core Files
+- **`App.tsx`** - Main container: auth state, project CRUD, Firestore sync, locking, AI orchestration
+- **`types.ts`** - TypeScript interfaces: `Message`, `SavedProject`, `SpecificationResponse`, `Attachment`
+- **`constants.ts`** - `SYSTEM_INSTRUCTION` prompt for Gemini (defines AI architect behavior)
 
-- **`components/`**
-  - `ChatPane.tsx` - Chat interface for conversational requirements gathering
-  - `EditorPane.tsx` - Dual-pane editor for functional and technical specs
-  - `MermaidRenderer.tsx` - Renders Mermaid diagrams embedded in specifications
+### Components
+- `ChatPane.tsx` - Chat interface with file attachment support
+- `EditorPane.tsx` - Triple-tab editor (Functional, Technical, Implementation Plan)
+- `MermaidRenderer.tsx` - Renders Mermaid diagrams with pan/zoom viewer
+- `MarkdownRenderer.tsx` - Markdown rendering with Mermaid block detection
+- `Avatar.tsx` - User avatar component
+- `UserGuide.tsx` - Help modal
 
-- **`services/`**
-  - `geminiService.ts` - Gemini AI integration with structured JSON response schema
-  - `firebase.ts` - Firebase initialization and service exports (Auth, Firestore, Storage)
-
-- **`types.ts`** - TypeScript type definitions for messages, projects, and specifications
-- **`constants.ts`** - System instructions and prompts for the AI architect
+### Services
+- `geminiService.ts` - Gemini API client with structured JSON schema output
+- `firebase.ts` - Firebase init with defensive pattern; exports auth/db/storage instances and Firestore helpers
 
 ### Key Design Patterns
 
-#### 1. Firebase Service Architecture
-The `firebase.ts` service module uses a defensive initialization pattern:
-- Checks if Firebase is already initialized via `getApps()` to avoid registry conflicts
-- Exports both service instances (`auth`, `db`, `storage`) and Firebase functions
-- Provides `isFirebaseEnabled()` helper to check if core services are available
-- Falls back to local storage if Firebase initialization fails
+#### Project Locking System
+Collaborative editing uses pessimistic locking:
+- User must acquire lock before editing (via `runTransaction`)
+- Lock includes: `lockedBy`, `lockedByName`, `lockedByAvatar`, `lockedAt`, `lastActivityAt`
+- Auto-unlock after 15 minutes of inactivity
+- Stale locks (>15 min) can be stolen by other users
+- Uses both `myLockTimestampRef` (ref for callbacks) and `myLockTimestamp` (state for UI)
+- Read-only mode for non-lock holders with real-time updates via `onSnapshot`
 
-#### 2. AI Conversation Flow
-The `GeminiService` class orchestrates AI-powered spec generation:
-- Maintains conversation history with full context (including attachments)
+#### Gemini API Integration
+- Model: `gemini-3-pro-preview`
 - Uses structured output with `responseMimeType: "application/json"` and `responseSchema`
-- Returns consistently formatted responses: `{ projectName, functional, technical, chatResponse }`
-- Maps conversation history roles: `user` → `user`, `assistant` → `model` for Gemini API
-- Supports file attachments (images, PDFs, etc.) via `inlineData` with base64 encoding
+- Response shape: `{ projectName, functional, technical, implementationPlan, chatResponse }`
+- Role mapping: `user` → `user`, `assistant` → `model`
+- Supports multimodal input (images, PDFs) via `inlineData` with base64 encoding
 
-#### 3. Real-time Data Sync
-Projects are synced in real-time using Firestore:
-- Uses `onSnapshot` with `orderBy("updatedAt", "desc")` query for live updates
-- Automatically falls back to localStorage if Firestore is unavailable
-- Save operations attempt cloud save first, fall back to localStorage on failure
-- Projects include `lastEditedBy`, `lastEditedAvatar`, and `ownerId` for collaboration metadata
+#### Real-time Sync
+- `onSnapshot` listeners for project list and active project
+- Falls back to localStorage if Firestore unavailable
+- Projects stored in `projects` collection with `orderBy("updatedAt", "desc")`
 
-#### 4. Environment Variable Handling
-Vite configuration maps environment variables:
-- `GEMINI_API_KEY` from `.env.local` → `process.env.API_KEY` in code
-- Uses `loadEnv()` and `define` in `vite.config.ts` for compile-time injection
+### AI-Generated Specs Default Stack
+The AI architect (configured in `constants.ts`) generates specs assuming:
+- Frontend: React 19 + Tailwind CSS
+- Backend: Next.js (App Router)
+- Database: Supabase (PostgreSQL)
+- Automation: n8n
 
-### Technology Stack
-- **Frontend**: React 19, TypeScript, Tailwind CSS
-- **Build Tool**: Vite 6.2
-- **AI Model**: Google Gemini 3 Pro (via `@google/genai` 1.3.0)
-- **Backend**: Firebase (Auth, Firestore, Storage)
-- **Icons**: lucide-react 0.475.0
+This is for *generated documentation*, not Draftio itself.
 
-### Default Technical Architecture
-The AI system is configured to generate specs using this default tech stack (see `constants.ts`):
-- **Frontend**: React 19 with Tailwind CSS
-- **Backend**: Next.js (App Router)
-- **Database**: Supabase (PostgreSQL)
-- **Automation/Integration**: n8n
+## Implementation Notes
 
-The AI architect is instructed to ask clarifying questions and engage in discovery dialogue rather than jump to conclusions.
-
-## Important Implementation Details
-
-### Gemini API Integration
-- Model ID: `gemini-3-pro-preview`
-- Requires `GoogleGenAI` initialization with `{ apiKey: process.env.API_KEY }`
-- Response text is extracted via `.text` property, then parsed as JSON
-- Supports multimodal input (text + images/PDFs) via `inlineData` parts
-
-### Firebase Configuration
-The Firebase configuration is hardcoded in `firebase.ts` for the `draft-io` project:
-- Project ID: `draft-io`
-- Uses Google Auth provider for sign-in
-- Firestore collection: `projects`
-- Exports `onAuthStateChanged`, `User` type, and all Firestore functions for type safety
+### Firebase
+- Project ID: `draft-io` (config hardcoded in `firebase.ts`)
+- Collection: `projects`
+- Auth: Google Sign-In via `GoogleAuthProvider`
+- `isFirebaseEnabled()` checks if auth/db initialized successfully
 
 ### State Management
-No external state management library is used. All state is managed via React hooks:
-- `useState` for local component state
-- `useEffect` for side effects (auth listeners, Firestore subscriptions)
-- `useCallback` and `useMemo` for performance optimization
+React hooks only (no Redux/Zustand). Uses refs alongside state for callback-stable values (see `myLockTimestampRef` pattern in `App.tsx`).
 
-### Styling Approach
-Uses Tailwind CSS utility classes with custom scrollbar styles defined inline via `<style>` tags in components.
+### Styling
+Tailwind CSS utilities. Custom scrollbar styles via inline `<style>` tags.
