@@ -1,13 +1,17 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { LogOut, Save, FolderOpen, Plus, Trash2, Clock, Sparkle, Download, FileText, Check, AlertCircle, RefreshCw, Users, Lock, Unlock, BookOpen, Menu, X, MessageSquare, FileEdit } from 'lucide-react';
+import { LogOut, Save, FolderOpen, Plus, Trash2, Clock, Sparkle, Download, FileText, Check, AlertCircle, RefreshCw, Users, Lock, Unlock, BookOpen, Menu, X, MessageSquare, FileEdit, LayoutGrid, FileText as FileTextIcon } from 'lucide-react';
 import ChatPane from './components/ChatPane';
 import EditorPane from './components/EditorPane';
+import ProjectPane from './components/ProjectPane';
+import TaskExtractionModal from './components/TaskExtractionModal';
+import TaskDetailPanel from './components/TaskDetailPanel';
 import Avatar from './components/Avatar';
 import UserGuide from './components/UserGuide';
 import { GeminiService } from './services/geminiService';
-import { Message, SavedProject, Attachment } from './types';
+import { Message, SavedProject, Attachment, AppMode, Task, Milestone, TaskExtractionResponse, ExtractedTask, ExtractedMilestone, TeamMember } from './types';
 import * as fb from './services/firebase';
+import './utils/seedUsers'; // Exposes seedUsers() to window for console access
 // Fix: Import onAuthStateChanged and User from local firebase service which re-exports them correctly.
 import { onAuthStateChanged, User } from './services/firebase';
 
@@ -29,6 +33,12 @@ const App: React.FC = () => {
   const [isLibraryOpen, setIsLibraryOpen] = useState(true);
   const [mobileView, setMobileView] = useState<'chat' | 'editor'>('chat');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [appMode, setAppMode] = useState<AppMode>('specs');
+  const [isExtractingTasks, setIsExtractingTasks] = useState(false);
+  const [extractionResult, setExtractionResult] = useState<TaskExtractionResponse | null>(null);
+  const [showExtractionModal, setShowExtractionModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [idleTimer, setIdleTimer] = useState<NodeJS.Timeout | null>(null);
   const [myLockTimestamp, setMyLockTimestamp] = useState<number | null>(null); // Track when I locked (for UI re-render)
 
@@ -42,6 +52,72 @@ const App: React.FC = () => {
   // We check this every render to ensure the UI is in sync
   const firebaseReady = fb.isFirebaseEnabled();
 
+  // Track project ID from URL for initial load
+  const [pendingProjectId, setPendingProjectId] = useState<string | null>(() => {
+    // Read project ID from URL on initial render
+    const path = window.location.pathname;
+    const match = path.match(/^\/([a-f0-9-]{36})$/i);
+    return match ? match[1] : null;
+  });
+
+  // Update URL when active project changes
+  useEffect(() => {
+    const currentPath = window.location.pathname;
+    const expectedPath = activeProjectId ? `/${activeProjectId}` : '/';
+
+    if (currentPath !== expectedPath) {
+      window.history.pushState({ projectId: activeProjectId }, '', expectedPath);
+    }
+  }, [activeProjectId]);
+
+  // Handle browser back/forward navigation
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const projectId = event.state?.projectId || null;
+      if (projectId) {
+        const project = savedProjectsRef.current.find(p => p.id === projectId);
+        if (project) {
+          loadProjectFromData(project);
+        }
+      } else {
+        // No project in state, go to new project
+        createNewProject();
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Load pending project from URL once projects are loaded
+  useEffect(() => {
+    if (pendingProjectId && savedProjects.length > 0) {
+      const project = savedProjects.find(p => p.id === pendingProjectId);
+      if (project) {
+        console.log('📂 Loading project from URL:', pendingProjectId);
+        loadProjectFromData(project);
+      } else {
+        console.log('⚠️ Project not found:', pendingProjectId);
+        // Clear invalid URL
+        window.history.replaceState(null, '', '/');
+      }
+      setPendingProjectId(null);
+    }
+  }, [pendingProjectId, savedProjects]);
+
+  // Helper to load project data without triggering URL update loop
+  const loadProjectFromData = (project: SavedProject) => {
+    setActiveProjectId(project.id);
+    setProjectName(project.projectName);
+    setFunctionalSpec(project.functional);
+    setTechnicalSpec(project.technical);
+    setImplementationPlan(project.implementationPlan || '');
+    setMessages(project.messages);
+    // Clear lock tracking when switching projects
+    myLockTimestampRef.current = null;
+    setMyLockTimestamp(null);
+  };
+
   // Derived lock states
   const currentProject = useMemo(() => {
     return savedProjects.find(p => p.id === activeProjectId);
@@ -54,29 +130,74 @@ const App: React.FC = () => {
     return firestoreLock || localLock;
   }, [currentProject, user, myLockTimestamp, activeProjectId]);
 
+  // Check if lock is stale (older than 15 minutes)
+  const isLockStale = useMemo(() => {
+    if (!currentProject?.lockedBy || !currentProject?.lastActivityAt) return false;
+    const fifteenMinutes = 15 * 60 * 1000;
+    return Date.now() - currentProject.lastActivityAt > fifteenMinutes;
+  }, [currentProject]);
+
   const isLockedByOther = useMemo(() => {
     // If I have the lock locally, it's not locked by others
     if (myLockTimestamp !== null && currentProject?.id === activeProjectId) return false;
+    // If the lock is stale (>15 min), treat it as unlocked (can be stolen)
+    if (isLockStale) return false;
     return currentProject?.lockedBy && currentProject.lockedBy !== user?.uid;
-  }, [currentProject, user, myLockTimestamp, activeProjectId]);
+  }, [currentProject, user, myLockTimestamp, activeProjectId, isLockStale]);
 
   const lockInfo = useMemo(() => {
     return {
       lockedByName: currentProject?.lockedByName,
       lockedByAvatar: currentProject?.lockedByAvatar,
-      lockedAt: currentProject?.lockedAt
+      lockedAt: currentProject?.lockedAt,
+      lastActivityAt: currentProject?.lastActivityAt,
+      isStale: isLockStale
     };
-  }, [currentProject]);
+  }, [currentProject, isLockStale]);
 
   const geminiService = useMemo(() => new GeminiService(), []);
 
   // Listen for Auth changes using the correctly exported onAuthStateChanged from local firebase service.
   useEffect(() => {
     if (!fb.auth) return;
-    const unsubscribe = onAuthStateChanged(fb.auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(fb.auth, async (currentUser) => {
       setUser(currentUser);
       console.log("👤 Auth State:", currentUser ? `Logged in as ${currentUser.displayName}` : "Logged out");
+
+      // Store/update user info in Firestore users collection
+      if (currentUser && fb.db) {
+        try {
+          const userDoc: TeamMember = {
+            uid: currentUser.uid,
+            displayName: currentUser.displayName,
+            email: currentUser.email,
+            photoURL: currentUser.photoURL,
+            lastSignIn: Date.now(),
+          };
+          await fb.setDoc(fb.doc(fb.db, "users", currentUser.uid), userDoc, { merge: true });
+          console.log("👥 User info stored in Firestore");
+        } catch (error) {
+          console.error("Failed to store user info:", error);
+        }
+      }
     });
+    return () => unsubscribe();
+  }, [firebaseReady]);
+
+  // Listen for team members (all users who have signed in)
+  useEffect(() => {
+    if (!fb.db) return;
+
+    console.log("👥 Loading team members...");
+    const q = fb.query(fb.collection(fb.db, "users"), fb.orderBy("lastSignIn", "desc"));
+    const unsubscribe = fb.onSnapshot(q, (snapshot) => {
+      const members = snapshot.docs.map(doc => doc.data() as TeamMember);
+      setTeamMembers(members);
+      console.log(`👥 Loaded ${members.length} team members`);
+    }, (error) => {
+      console.error("❌ Team members sync error:", error);
+    });
+
     return () => unsubscribe();
   }, [firebaseReady]);
 
@@ -206,6 +327,9 @@ const App: React.FC = () => {
 
     console.log('🔍 DEBUG saveCurrentProject - lockFields:', lockFields);
 
+    // Get current project's PM data to preserve it during saves
+    const existingProject = savedProjectsRef.current.find(p => p.id === id);
+
     const newProject = {
       id,
       projectName,
@@ -216,7 +340,16 @@ const App: React.FC = () => {
       updatedAt: Date.now(),
       lastEditedBy: user?.displayName || 'Anonymous',
       lastEditedAvatar: user?.photoURL || null,
-      ownerId: user?.uid || 'anonymous',
+      // Preserve original owner info (don't overwrite on subsequent saves)
+      ownerId: existingProject?.ownerId || user?.uid || 'anonymous',
+      ownerName: existingProject?.ownerName || user?.displayName || 'Anonymous',
+      ownerAvatar: existingProject?.ownerAvatar || user?.photoURL || null,
+      // Preserve project management fields
+      tasks: existingProject?.tasks || [],
+      milestones: existingProject?.milestones || [],
+      timeEntries: existingProject?.timeEntries || [],
+      comments: existingProject?.comments || [],
+      lastTaskExtraction: existingProject?.lastTaskExtraction || null,
       ...lockFields
     };
 
@@ -264,15 +397,7 @@ const App: React.FC = () => {
   }, [activeProjectId, projectName, functionalSpec, technicalSpec, implementationPlan, messages, user]); // Note: myLockTimestamp removed - we read from ref instead
 
   const loadProject = (project: SavedProject) => {
-    setActiveProjectId(project.id);
-    setProjectName(project.projectName);
-    setFunctionalSpec(project.functional);
-    setTechnicalSpec(project.technical);
-    setImplementationPlan(project.implementationPlan || '');
-    setMessages(project.messages);
-    // Clear lock tracking when switching projects
-    myLockTimestampRef.current = null;
-    setMyLockTimestamp(null);
+    loadProjectFromData(project);
   };
 
   const createNewProject = () => {
@@ -460,6 +585,368 @@ const App: React.FC = () => {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []); // Empty deps - handler uses refs for current values
 
+  // Handler for changing task status (from drag-and-drop)
+  const handleTaskStatusChange = useCallback(async (taskId: string, newStatus: Task['status']) => {
+    if (!currentProject || !activeProjectId || !fb.db) return;
+
+    const tasks = currentProject.tasks || [];
+    const taskIndex = tasks.findIndex(t => t.id === taskId);
+    if (taskIndex === -1) return;
+
+    const now = Date.now();
+    const updatedTask = {
+      ...tasks[taskIndex],
+      status: newStatus,
+      completedAt: newStatus === 'done' ? now : null,
+      updatedAt: now,
+    };
+
+    const updatedTasks = [...tasks];
+    updatedTasks[taskIndex] = updatedTask;
+
+    try {
+      await fb.updateDoc(fb.doc(fb.db, "projects", activeProjectId), {
+        tasks: updatedTasks,
+        updatedAt: now,
+      });
+      console.log(`✅ Task "${updatedTask.title}" moved to ${newStatus}`);
+    } catch (error) {
+      console.error('Failed to update task status:', error);
+    }
+  }, [currentProject, activeProjectId]);
+
+  // Handler for clicking on a task (opens detail panel)
+  const handleTaskClick = useCallback((task: Task) => {
+    console.log('📋 Task clicked:', task.title);
+    setSelectedTask(task);
+  }, []);
+
+  // Handler for updating a task
+  const handleTaskUpdate = useCallback(async (taskId: string, updates: Partial<Task>) => {
+    if (!currentProject || !activeProjectId || !fb.db) return;
+
+    const tasks = currentProject.tasks || [];
+    const taskIndex = tasks.findIndex(t => t.id === taskId);
+    if (taskIndex === -1) return;
+
+    const now = Date.now();
+    const updatedTask = {
+      ...tasks[taskIndex],
+      ...updates,
+      updatedAt: now,
+    };
+
+    const updatedTasks = [...tasks];
+    updatedTasks[taskIndex] = updatedTask;
+
+    try {
+      await fb.updateDoc(fb.doc(fb.db, "projects", activeProjectId), {
+        tasks: updatedTasks,
+        updatedAt: now,
+      });
+      console.log(`✅ Task "${updatedTask.title}" updated`);
+    } catch (error) {
+      console.error('Failed to update task:', error);
+      alert('Failed to update task. Please try again.');
+    }
+  }, [currentProject, activeProjectId]);
+
+  // Handler for deleting a task
+  const handleTaskDelete = useCallback(async (taskId: string) => {
+    if (!currentProject || !activeProjectId || !fb.db) return;
+
+    const tasks = currentProject.tasks || [];
+    const taskToDelete = tasks.find(t => t.id === taskId);
+    const updatedTasks = tasks.filter(t => t.id !== taskId);
+
+    // Also remove this task from any dependencies
+    const cleanedTasks = updatedTasks.map(t => ({
+      ...t,
+      dependsOn: t.dependsOn.filter(depId => depId !== taskId),
+    }));
+
+    try {
+      await fb.updateDoc(fb.doc(fb.db, "projects", activeProjectId), {
+        tasks: cleanedTasks,
+        updatedAt: Date.now(),
+      });
+      console.log(`🗑️ Task "${taskToDelete?.title}" deleted`);
+    } catch (error) {
+      console.error('Failed to delete task:', error);
+      alert('Failed to delete task. Please try again.');
+    }
+  }, [currentProject, activeProjectId]);
+
+  // Handler for logging time on a task
+  const handleLogTime = useCallback(async (taskId: string, hours: number, description: string) => {
+    if (!currentProject || !activeProjectId || !fb.db || !user) return;
+
+    const now = Date.now();
+    const newEntry = {
+      id: crypto.randomUUID(),
+      taskId,
+      userId: user.uid,
+      userName: user.displayName || 'Anonymous',
+      userAvatar: user.photoURL || null,
+      hours,
+      description,
+      loggedAt: now,
+    };
+
+    const timeEntries = [...(currentProject.timeEntries || []), newEntry];
+
+    // Update task's loggedHours
+    const tasks = currentProject.tasks || [];
+    const taskIndex = tasks.findIndex(t => t.id === taskId);
+    if (taskIndex !== -1) {
+      const updatedTasks = [...tasks];
+      updatedTasks[taskIndex] = {
+        ...updatedTasks[taskIndex],
+        loggedHours: (updatedTasks[taskIndex].loggedHours || 0) + hours,
+        updatedAt: now,
+      };
+
+      try {
+        await fb.updateDoc(fb.doc(fb.db, "projects", activeProjectId), {
+          timeEntries,
+          tasks: updatedTasks,
+          updatedAt: now,
+        });
+        console.log(`⏱️ Logged ${hours}h on task`);
+      } catch (error) {
+        console.error('Failed to log time:', error);
+      }
+    }
+  }, [currentProject, activeProjectId, user]);
+
+  // Handler for deleting a time entry
+  const handleDeleteTimeEntry = useCallback(async (entryId: string) => {
+    if (!currentProject || !activeProjectId || !fb.db) return;
+
+    const timeEntries = currentProject.timeEntries || [];
+    const entryToDelete = timeEntries.find(e => e.id === entryId);
+    if (!entryToDelete) return;
+
+    const updatedEntries = timeEntries.filter(e => e.id !== entryId);
+
+    // Update task's loggedHours
+    const tasks = currentProject.tasks || [];
+    const taskIndex = tasks.findIndex(t => t.id === entryToDelete.taskId);
+    if (taskIndex !== -1) {
+      const updatedTasks = [...tasks];
+      updatedTasks[taskIndex] = {
+        ...updatedTasks[taskIndex],
+        loggedHours: Math.max(0, (updatedTasks[taskIndex].loggedHours || 0) - entryToDelete.hours),
+        updatedAt: Date.now(),
+      };
+
+      try {
+        await fb.updateDoc(fb.doc(fb.db, "projects", activeProjectId), {
+          timeEntries: updatedEntries,
+          tasks: updatedTasks,
+          updatedAt: Date.now(),
+        });
+        console.log(`🗑️ Deleted time entry`);
+      } catch (error) {
+        console.error('Failed to delete time entry:', error);
+      }
+    }
+  }, [currentProject, activeProjectId]);
+
+  // Handler for adding a comment
+  const handleAddComment = useCallback(async (taskId: string, content: string) => {
+    if (!currentProject || !activeProjectId || !fb.db || !user) return;
+
+    const now = Date.now();
+    const newComment = {
+      id: crypto.randomUUID(),
+      taskId,
+      userId: user.uid,
+      userName: user.displayName || 'Anonymous',
+      userAvatar: user.photoURL || null,
+      content,
+      createdAt: now,
+      updatedAt: null,
+    };
+
+    const comments = [...(currentProject.comments || []), newComment];
+
+    try {
+      await fb.updateDoc(fb.doc(fb.db, "projects", activeProjectId), {
+        comments,
+        updatedAt: now,
+      });
+      console.log(`💬 Added comment`);
+    } catch (error) {
+      console.error('Failed to add comment:', error);
+    }
+  }, [currentProject, activeProjectId, user]);
+
+  // Handler for editing a comment
+  const handleEditComment = useCallback(async (commentId: string, content: string) => {
+    if (!currentProject || !activeProjectId || !fb.db) return;
+
+    const comments = currentProject.comments || [];
+    const commentIndex = comments.findIndex(c => c.id === commentId);
+    if (commentIndex === -1) return;
+
+    const now = Date.now();
+    const updatedComments = [...comments];
+    updatedComments[commentIndex] = {
+      ...updatedComments[commentIndex],
+      content,
+      updatedAt: now,
+    };
+
+    try {
+      await fb.updateDoc(fb.doc(fb.db, "projects", activeProjectId), {
+        comments: updatedComments,
+        updatedAt: now,
+      });
+      console.log(`✏️ Edited comment`);
+    } catch (error) {
+      console.error('Failed to edit comment:', error);
+    }
+  }, [currentProject, activeProjectId]);
+
+  // Handler for deleting a comment
+  const handleDeleteComment = useCallback(async (commentId: string) => {
+    if (!currentProject || !activeProjectId || !fb.db) return;
+
+    const comments = currentProject.comments || [];
+    const updatedComments = comments.filter(c => c.id !== commentId);
+
+    try {
+      await fb.updateDoc(fb.doc(fb.db, "projects", activeProjectId), {
+        comments: updatedComments,
+        updatedAt: Date.now(),
+      });
+      console.log(`🗑️ Deleted comment`);
+    } catch (error) {
+      console.error('Failed to delete comment:', error);
+    }
+  }, [currentProject, activeProjectId]);
+
+  // Handler for extracting tasks from implementation plan
+  const handleExtractTasks = useCallback(async () => {
+    if (!implementationPlan || !currentProject) {
+      alert('No implementation plan available to extract tasks from.');
+      return;
+    }
+
+    setIsExtractingTasks(true);
+    try {
+      console.log('🤖 Starting AI task extraction...');
+      const result = await geminiService.extractTasks(
+        implementationPlan,
+        currentProject.projectName,
+        currentProject.tasks || [],
+        currentProject.milestones || []
+      );
+      console.log('✅ Task extraction complete:', result);
+
+      setExtractionResult(result);
+      setShowExtractionModal(true);
+    } catch (error) {
+      console.error('Task extraction failed:', error);
+      alert('Failed to extract tasks. Please try again.');
+    } finally {
+      setIsExtractingTasks(false);
+    }
+  }, [implementationPlan, currentProject, geminiService]);
+
+  // Handler for confirming extracted tasks
+  const handleConfirmExtraction = useCallback(async (
+    selectedTasks: ExtractedTask[],
+    selectedMilestones: ExtractedMilestone[]
+  ) => {
+    if (!currentProject || !user || !activeProjectId) return;
+
+    console.log('📥 Importing tasks:', selectedTasks.length, 'milestones:', selectedMilestones.length);
+
+    // Create milestone objects with IDs
+    const now = Date.now();
+    const newMilestones: Milestone[] = selectedMilestones.map((m, index) => ({
+      id: crypto.randomUUID(),
+      projectId: activeProjectId,
+      name: m.name,
+      description: m.description,
+      targetDate: null,
+      completedAt: null,
+      orderIndex: (currentProject.milestones?.length || 0) + index,
+      createdAt: now,
+      updatedAt: now,
+    }));
+
+    // Create a map of milestone names to IDs
+    const milestoneNameToId: Record<string, string> = {};
+    [...(currentProject.milestones || []), ...newMilestones].forEach(m => {
+      milestoneNameToId[m.name] = m.id;
+    });
+
+    // Create task objects with IDs
+    const newTasks: Task[] = selectedTasks.map((t, index) => ({
+      id: crypto.randomUUID(),
+      projectId: activeProjectId,
+      title: t.title,
+      description: t.description,
+      status: 'todo' as const,
+      priority: t.priority,
+      assigneeIds: [],
+      assigneeNames: [],
+      assigneeAvatars: [],
+      estimatedHours: t.estimatedHours,
+      loggedHours: 0,
+      dueDate: null,
+      startDate: null,
+      completedAt: null,
+      dependsOn: [], // Will be resolved after all tasks are created
+      milestoneId: t.milestoneName ? milestoneNameToId[t.milestoneName] || null : null,
+      orderIndex: (currentProject.tasks?.length || 0) + index,
+      createdBy: user.uid,
+      createdAt: now,
+      updatedAt: now,
+    }));
+
+    // Resolve dependencies (map task titles to IDs)
+    const taskTitleToId: Record<string, string> = {};
+    [...(currentProject.tasks || []), ...newTasks].forEach(t => {
+      taskTitleToId[t.title] = t.id;
+    });
+
+    newTasks.forEach((task, index) => {
+      const extractedTask = selectedTasks[index];
+      if (extractedTask.dependsOn && extractedTask.dependsOn.length > 0) {
+        task.dependsOn = extractedTask.dependsOn
+          .map(title => taskTitleToId[title])
+          .filter(Boolean) as string[];
+      }
+    });
+
+    // Update project with new tasks and milestones
+    const updatedTasks = [...(currentProject.tasks || []), ...newTasks];
+    const updatedMilestones = [...(currentProject.milestones || []), ...newMilestones];
+
+    try {
+      if (fb.db) {
+        await fb.updateDoc(fb.doc(fb.db, "projects", activeProjectId), {
+          tasks: updatedTasks,
+          milestones: updatedMilestones,
+          lastTaskExtraction: now,
+          updatedAt: now,
+        });
+        console.log('✅ Tasks and milestones saved to Firestore');
+      }
+    } catch (error) {
+      console.error('Failed to save tasks:', error);
+      alert('Failed to save tasks. Please try again.');
+    }
+
+    // Close modal
+    setShowExtractionModal(false);
+    setExtractionResult(null);
+  }, [currentProject, user, activeProjectId]);
+
   const handleSendMessage = useCallback(async (content: string, attachment?: Attachment) => {
     // For EXISTING projects, require lock. For NEW projects (no activeProjectId), allow messaging.
     const isNewProject = !activeProjectId;
@@ -477,6 +964,7 @@ const App: React.FC = () => {
       content,
       displayName: user?.displayName || 'Anonymous',
       photoURL: user?.photoURL || null,
+      timestamp: Date.now(),
       ...(attachment && { attachment })
     };
     const newMessages = [...messages, userMessage];
@@ -489,7 +977,7 @@ const App: React.FC = () => {
       setFunctionalSpec(response.functional);
       setTechnicalSpec(response.technical);
       setImplementationPlan(response.implementationPlan);
-      setMessages(prev => [...prev, { role: 'assistant', content: response.chatResponse }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: response.chatResponse, timestamp: Date.now() }]);
 
       // For NEW projects, create and auto-lock
       if (isNewProject && fb.db && user) {
@@ -508,16 +996,24 @@ const App: React.FC = () => {
           functional: response.functional,
           technical: response.technical,
           implementationPlan: response.implementationPlan,
-          messages: [...newMessages, { role: 'assistant', content: response.chatResponse }],
+          messages: [...newMessages, { role: 'assistant', content: response.chatResponse, timestamp: Date.now() }],
           updatedAt: Date.now(),
           lastEditedBy: user.displayName || 'Anonymous',
           lastEditedAvatar: user.photoURL || null,
           ownerId: user.uid,
+          ownerName: user.displayName || 'Anonymous',
+          ownerAvatar: user.photoURL || null,
           lockedBy: user.uid,
           lockedByName: user.displayName,
           lockedByAvatar: user.photoURL,
           lockedAt: lockTime,
-          lastActivityAt: lockTime
+          lastActivityAt: lockTime,
+          // Initialize project management fields as empty
+          tasks: [],
+          milestones: [],
+          timeEntries: [],
+          comments: [],
+          lastTaskExtraction: null
         };
 
         await fb.setDoc(fb.doc(fb.db, "projects", newId), newProject);
@@ -542,7 +1038,7 @@ const App: React.FC = () => {
       }
 
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'assistant', content: "Draftio: Architect disconnected. Please check your connection or Gemini API key." }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: "Draftio: Architect disconnected. Please check your connection or Gemini API key.", timestamp: Date.now() }]);
     } finally {
       setIsLoading(false);
     }
@@ -586,12 +1082,12 @@ const App: React.FC = () => {
                   onKeyDown={handleNameKeyDown}
                   autoFocus
                   maxLength={100}
-                  className="text-[9px] text-indigo-600 font-bold uppercase max-w-[100px] sm:max-w-[150px] bg-indigo-50 border border-indigo-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="text-[11px] sm:text-xs text-indigo-600 font-bold uppercase max-w-[120px] sm:max-w-[180px] bg-indigo-50 border border-indigo-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
               ) : (
                 <p
                   onClick={startEditingName}
-                  className="text-[9px] text-indigo-600 font-bold uppercase truncate max-w-[80px] sm:max-w-[150px] cursor-pointer hover:bg-indigo-50 hover:px-1 rounded transition-all"
+                  className="text-[11px] sm:text-xs text-indigo-600 font-bold uppercase truncate max-w-[100px] sm:max-w-[180px] cursor-pointer hover:bg-indigo-50 hover:px-1 rounded transition-all"
                   title="Click to edit project name"
                 >
                   {projectName}
@@ -600,6 +1096,32 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Mode Toggle */}
+          <div className="hidden sm:flex items-center bg-slate-100 rounded-lg p-1">
+            <button
+              onClick={() => setAppMode('specs')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all ${
+                appMode === 'specs'
+                  ? 'bg-white text-indigo-600 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              Specs
+            </button>
+            <button
+              onClick={() => setAppMode('project')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all ${
+                appMode === 'project'
+                  ? 'bg-white text-indigo-600 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              Project
+            </button>
+          </div>
 
         <div className="flex items-center gap-1 sm:gap-3">
           <button
@@ -646,6 +1168,16 @@ const App: React.FC = () => {
               <Unlock className="w-3 h-3 sm:w-4 sm:h-4" />
               <span className="hidden sm:inline">UNLOCK</span>
             </button>
+          ) : lockInfo.isStale && lockInfo.lockedByName ? (
+            <button
+              onClick={lockProject}
+              disabled={!activeProjectId}
+              className="px-2 sm:px-4 py-2 text-[10px] sm:text-xs font-black uppercase rounded-lg transition-all flex items-center gap-1 sm:gap-2 shadow-md bg-amber-500 hover:bg-amber-600 text-white"
+              title={`Previous lock by ${lockInfo.lockedByName} expired (idle >15 min)`}
+            >
+              <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">TAKE OVER</span>
+            </button>
           ) : (
             <button
               onClick={lockProject}
@@ -678,9 +1210,9 @@ const App: React.FC = () => {
           ${isLibraryOpen ? 'md:w-64' : 'md:w-0'}
         `}>
           <div className="w-72 md:w-64 flex flex-col h-full">
-            <div className="p-4 flex justify-between items-center text-slate-400 border-b border-slate-700">
-              <div className="flex items-center gap-2"><Users className="w-4 h-4" /><span className="text-[10px] font-black uppercase">Workspace Library</span></div>
-              <button onClick={createNewProject} className="p-1 hover:bg-slate-700 rounded transition-colors"><Plus className="w-4 h-4" /></button>
+            <div className="p-4 flex justify-between items-center text-slate-300 border-b border-slate-700">
+              <div className="flex items-center gap-2"><Users className="w-4 h-4" /><span className="text-xs font-black uppercase tracking-wide">Workspace Library</span></div>
+              <button onClick={createNewProject} className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors" title="New Project"><Plus className="w-4 h-4" /></button>
             </div>
             {/* Mobile-only menu items */}
             <div className="md:hidden p-3 border-b border-slate-700 space-y-2">
@@ -708,24 +1240,59 @@ const App: React.FC = () => {
             <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
               {savedProjects.length === 0 ? (
                 <div className="p-6 text-center">
-                   <p className="text-[10px] text-slate-500 font-black uppercase italic">Library Empty</p>
+                   <p className="text-xs text-slate-400 font-bold uppercase italic">Library Empty</p>
+                   <p className="text-[10px] text-slate-500 mt-1">Click + to create a new project</p>
                 </div>
               ) : (
-                savedProjects.map(p => (
-                  <div
-                    key={p.id}
-                    onClick={() => { loadProject(p); setIsMobileMenuOpen(false); }}
-                    className={`group p-3 rounded-xl cursor-pointer border transition-all ${activeProjectId === p.id ? 'bg-indigo-600/20 border-indigo-500/40' : 'bg-slate-800/50 border-transparent hover:border-slate-600'}`}
-                  >
-                    <div className="flex justify-between items-start mb-1">
-                      <h4 className="text-sm font-bold text-slate-200 truncate">{p.projectName}</h4>
-                      <button onClick={(e) => deleteProject(p.id, e)} className="opacity-0 group-hover:opacity-100 p-1 text-slate-500 hover:text-red-400"><Trash2 className="w-3 h-3" /></button>
+                savedProjects.map(p => {
+                  const owner = teamMembers.find(m => m.uid === p.ownerId);
+                  // Use teamMember photo first, then stored owner info, then lastEdited as final fallback
+                  const ownerPhoto = owner?.photoURL || p.ownerAvatar || p.lastEditedAvatar;
+                  const ownerName = owner?.displayName || p.ownerName || p.lastEditedBy || owner?.email || 'Unknown';
+
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => { loadProject(p); setIsMobileMenuOpen(false); }}
+                      className={`group p-3 rounded-xl cursor-pointer border transition-all ${activeProjectId === p.id ? 'bg-indigo-600/20 border-indigo-500/40' : 'bg-slate-800/50 border-transparent hover:border-slate-600'}`}
+                    >
+                      <div className="flex justify-between items-start mb-1.5">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div
+                            className="shrink-0 w-5 h-5"
+                            title={`Created by ${ownerName}`}
+                          >
+                            {ownerPhoto ? (
+                              <img
+                                src={ownerPhoto}
+                                alt={ownerName}
+                                className="w-5 h-5 rounded-full border border-slate-600 object-cover"
+                                onLoad={() => console.log('✅ Image loaded:', p.projectName)}
+                                onError={(e) => {
+                                  console.log('❌ Image failed to load:', ownerPhoto);
+                                  e.currentTarget.style.display = 'none';
+                                  const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                  if (fallback) fallback.style.display = 'flex';
+                                }}
+                              />
+                            ) : null}
+                            <div
+                              className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-[9px] font-bold text-white border border-slate-600"
+                              style={{ display: ownerPhoto ? 'none' : 'flex' }}
+                            >
+                              {ownerName.charAt(0).toUpperCase()}
+                            </div>
+                          </div>
+                          <h4 className="text-sm font-bold text-slate-200 truncate">{p.projectName}</h4>
+                        </div>
+                        <button onClick={(e) => deleteProject(p.id, e)} className="opacity-0 group-hover:opacity-100 p-1 text-slate-500 hover:text-red-400 shrink-0"><Trash2 className="w-3 h-3" /></button>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-semibold pl-7">
+                        <Clock className="w-3 h-3" /> {new Date(p.updatedAt).toLocaleDateString()} • {new Date(p.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5 text-[8px] text-slate-500 font-bold uppercase">
-                      <Clock className="w-2.5 h-2.5" /> {new Date(p.updatedAt).toLocaleDateString()}
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -745,68 +1312,118 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* Mobile View Toggle */}
-          <div className="md:hidden flex border-b border-slate-200 bg-white shrink-0">
-            <button
-              onClick={() => setMobileView('chat')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-all border-b-2 ${
-                mobileView === 'chat'
-                  ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50'
-                  : 'border-transparent text-slate-500'
-              }`}
-            >
-              <MessageSquare className="w-4 h-4" />
-              Chat
-            </button>
-            <button
-              onClick={() => setMobileView('editor')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-all border-b-2 ${
-                mobileView === 'editor'
-                  ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50'
-                  : 'border-transparent text-slate-500'
-              }`}
-            >
-              <FileEdit className="w-4 h-4" />
-              Editor
-            </button>
-          </div>
+          {appMode === 'specs' ? (
+            <>
+              {/* Mobile View Toggle */}
+              <div className="md:hidden flex border-b border-slate-200 bg-white shrink-0">
+                <button
+                  onClick={() => setMobileView('chat')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-all border-b-2 ${
+                    mobileView === 'chat'
+                      ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50'
+                      : 'border-transparent text-slate-500'
+                  }`}
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  Chat
+                </button>
+                <button
+                  onClick={() => setMobileView('editor')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-all border-b-2 ${
+                    mobileView === 'editor'
+                      ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50'
+                      : 'border-transparent text-slate-500'
+                  }`}
+                >
+                  <FileEdit className="w-4 h-4" />
+                  Editor
+                </button>
+              </div>
 
-          <div className="flex-1 flex overflow-hidden">
-            {/* Chat Section - Full width on mobile when active, fixed width on desktop */}
-            <section className={`
-              ${mobileView === 'chat' ? 'flex' : 'hidden'}
-              md:flex md:w-[380px] lg:w-[420px] w-full shrink-0 border-r border-slate-800 shadow-xl z-10
-            `}>
-              <ChatPane
-                messages={messages}
-                onSendMessage={handleSendMessage}
-                isLoading={isLoading}
-                isReadOnly={isLockedByOther || false}
-                lockedByName={lockInfo.lockedByName}
-              />
-            </section>
-            {/* Editor Section - Full width on mobile when active, flexible on desktop */}
-            <section className={`
-              ${mobileView === 'editor' ? 'flex' : 'hidden'}
-              md:flex flex-1 bg-slate-50
-            `}>
-              <EditorPane
-                functional={functionalSpec}
-                technical={technicalSpec}
-                implementationPlan={implementationPlan}
-                onUpdateFunctional={setFunctionalSpec}
-                onUpdateTechnical={setTechnicalSpec}
-                onUpdateImplementationPlan={setImplementationPlan}
-                isReadOnly={isLockedByOther || false}
-                lockedByName={lockInfo.lockedByName}
-              />
-            </section>
-          </div>
+              <div className="flex-1 flex overflow-hidden">
+                {/* Chat Section - Full width on mobile when active, fixed width on desktop */}
+                <section className={`
+                  ${mobileView === 'chat' ? 'flex' : 'hidden'}
+                  md:flex md:w-[380px] lg:w-[420px] w-full shrink-0 border-r border-slate-800 shadow-xl z-10
+                `}>
+                  <ChatPane
+                    messages={messages}
+                    onSendMessage={handleSendMessage}
+                    isLoading={isLoading}
+                    isReadOnly={isLockedByOther || false}
+                    lockedByName={lockInfo.lockedByName}
+                  />
+                </section>
+                {/* Editor Section - Full width on mobile when active, flexible on desktop */}
+                <section className={`
+                  ${mobileView === 'editor' ? 'flex' : 'hidden'}
+                  md:flex flex-1 bg-slate-50
+                `}>
+                  <EditorPane
+                    functional={functionalSpec}
+                    technical={technicalSpec}
+                    implementationPlan={implementationPlan}
+                    onUpdateFunctional={setFunctionalSpec}
+                    onUpdateTechnical={setTechnicalSpec}
+                    onUpdateImplementationPlan={setImplementationPlan}
+                    isReadOnly={isLockedByOther || false}
+                    lockedByName={lockInfo.lockedByName}
+                  />
+                </section>
+              </div>
+            </>
+          ) : (
+            /* Project Mode */
+            <ProjectPane
+              project={currentProject}
+              teamMembers={teamMembers}
+              isLockedByMe={isLockedByMe}
+              isReadOnly={isLockedByOther || false}
+              onExtractTasks={handleExtractTasks}
+              isExtractingTasks={isExtractingTasks}
+              onTaskStatusChange={handleTaskStatusChange}
+              onTaskClick={handleTaskClick}
+            />
+          )}
         </div>
       </div>
 
       {/* User Guide Modal */}
       {showUserGuide && <UserGuide onClose={() => setShowUserGuide(false)} />}
+
+      {/* Task Extraction Modal */}
+      {showExtractionModal && extractionResult && (
+        <TaskExtractionModal
+          extractionResult={extractionResult}
+          onConfirm={handleConfirmExtraction}
+          onCancel={() => {
+            setShowExtractionModal(false);
+            setExtractionResult(null);
+          }}
+        />
+      )}
+
+      {/* Task Detail Panel */}
+      {selectedTask && currentProject && (
+        <TaskDetailPanel
+          task={selectedTask}
+          milestones={currentProject.milestones || []}
+          allTasks={currentProject.tasks || []}
+          timeEntries={currentProject.timeEntries || []}
+          comments={currentProject.comments || []}
+          teamMembers={teamMembers}
+          currentUserId={user?.uid || ''}
+          onUpdate={handleTaskUpdate}
+          onDelete={handleTaskDelete}
+          onLogTime={handleLogTime}
+          onDeleteTimeEntry={handleDeleteTimeEntry}
+          onAddComment={handleAddComment}
+          onEditComment={handleEditComment}
+          onDeleteComment={handleDeleteComment}
+          onClose={() => setSelectedTask(null)}
+          isReadOnly={isLockedByOther || false}
+        />
+      )}
     </div>
   );
 };

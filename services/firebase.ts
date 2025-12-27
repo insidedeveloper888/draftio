@@ -3,7 +3,7 @@ import { initializeApp, getApp, getApps } from "firebase/app";
 import type { FirebaseApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 import type { Auth, User } from "firebase/auth";
-import { getFirestore, collection, query, where, onSnapshot, doc, setDoc, deleteDoc, orderBy, runTransaction, updateDoc } from "firebase/firestore";
+import { getFirestore, collection, query, where, onSnapshot, doc, setDoc, deleteDoc, orderBy, runTransaction, updateDoc, getDocs } from "firebase/firestore";
 import type { Firestore } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import type { FirebaseStorage } from "firebase/storage";
@@ -42,7 +42,7 @@ export const googleProvider = new GoogleAuthProvider();
 export {
   auth, db, storage,
   signInWithPopup, signOut, onAuthStateChanged,
-  collection, query, where, onSnapshot, doc, setDoc, deleteDoc, orderBy, runTransaction, updateDoc,
+  collection, query, where, onSnapshot, doc, setDoc, deleteDoc, orderBy, runTransaction, updateDoc, getDocs,
   ref, uploadBytes, getDownloadURL
 };
 

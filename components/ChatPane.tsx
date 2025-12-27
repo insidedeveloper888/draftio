@@ -139,6 +139,11 @@ const ChatPane: React.FC<ChatPaneProps> = ({ messages, onSendMessage, isLoading,
                 )}
                 <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
               </div>
+              {msg.timestamp && (
+                <span className={`text-[9px] text-slate-500 px-1 ${msg.role === 'user' ? 'text-right' : ''}`}>
+                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
             </div>
           </div>
         ))}

@@ -27,24 +27,24 @@ Vite maps this to `process.env.API_KEY` at build time via `vite.config.ts`.
 
 ## Architecture Overview
 
-Flat component structure with all source files in root directory (no `src/` folder). Use `@/` path alias for imports.
+No `src/` folder - core files in root, with `components/` and `services/` subdirectories. Use `@/` path alias for imports (maps to project root).
 
-### Core Files
-- **`App.tsx`** - Main container: auth state, project CRUD, Firestore sync, locking, AI orchestration
-- **`types.ts`** - TypeScript interfaces: `Message`, `SavedProject`, `SpecificationResponse`, `Attachment`
-- **`constants.ts`** - `SYSTEM_INSTRUCTION` prompt for Gemini (defines AI architect behavior)
-
-### Components
-- `ChatPane.tsx` - Chat interface with file attachment support
-- `EditorPane.tsx` - Triple-tab editor (Functional, Technical, Implementation Plan)
-- `MermaidRenderer.tsx` - Renders Mermaid diagrams with pan/zoom viewer
-- `MarkdownRenderer.tsx` - Markdown rendering with Mermaid block detection
-- `Avatar.tsx` - User avatar component
-- `UserGuide.tsx` - Help modal
-
-### Services
-- `geminiService.ts` - Gemini API client with structured JSON schema output
-- `firebase.ts` - Firebase init with defensive pattern; exports auth/db/storage instances and Firestore helpers
+### Structure
+```
+├── App.tsx              # Main container: auth, project CRUD, Firestore sync, locking, AI orchestration
+├── types.ts             # TypeScript interfaces + TabType enum
+├── constants.ts         # SYSTEM_INSTRUCTION prompt (AI architect behavior)
+├── components/
+│   ├── ChatPane.tsx     # Chat interface with file attachments
+│   ├── EditorPane.tsx   # Triple-tab editor (Functional/Technical/Implementation Plan)
+│   ├── MermaidRenderer.tsx  # Mermaid diagrams with pan/zoom (Figma-like)
+│   ├── MarkdownRenderer.tsx # Markdown with Mermaid block detection
+│   ├── Avatar.tsx       # User avatar component
+│   └── UserGuide.tsx    # Help modal
+└── services/
+    ├── geminiService.ts # Gemini API client with structured JSON output
+    └── firebase.ts      # Firebase init + Firestore/Auth/Storage helpers
+```
 
 ### Key Design Patterns
 
@@ -58,25 +58,26 @@ Collaborative editing uses pessimistic locking:
 - Read-only mode for non-lock holders with real-time updates via `onSnapshot`
 
 #### Gemini API Integration
-- Model: `gemini-3-pro-preview`
+- Model: `gemini-3-pro-preview` (via `@google/genai` SDK)
 - Uses structured output with `responseMimeType: "application/json"` and `responseSchema`
 - Response shape: `{ projectName, functional, technical, implementationPlan, chatResponse }`
 - Role mapping: `user` → `user`, `assistant` → `model`
 - Supports multimodal input (images, PDFs) via `inlineData` with base64 encoding
+- Date context injected into system instruction for accurate Gantt charts
 
 #### Real-time Sync
 - `onSnapshot` listeners for project list and active project
 - Falls back to localStorage if Firestore unavailable
 - Projects stored in `projects` collection with `orderBy("updatedAt", "desc")`
 
-### AI-Generated Specs Default Stack
+#### AI-Generated Specs Default Stack
 The AI architect (configured in `constants.ts`) generates specs assuming:
 - Frontend: React 19 + Tailwind CSS
 - Backend: Next.js (App Router)
 - Database: Supabase (PostgreSQL)
 - Automation: n8n
 
-This is for *generated documentation*, not Draftio itself.
+This is for *generated documentation*, not Draftio itself. The `PESTIO_SPEC` constant serves as a quality benchmark example.
 
 ## Implementation Notes
 
@@ -91,3 +92,8 @@ React hooks only (no Redux/Zustand). Uses refs alongside state for callback-stab
 
 ### Styling
 Tailwind CSS utilities. Custom scrollbar styles via inline `<style>` tags.
+
+### Vite Config
+- Path alias: `@/` → project root
+- Exposes `GEMINI_API_KEY` as both `process.env.API_KEY` and `process.env.GEMINI_API_KEY`
+- Dev server: `0.0.0.0:3000`
