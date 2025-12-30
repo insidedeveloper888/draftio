@@ -47,6 +47,18 @@ const App: React.FC = () => {
   const savedProjectsRef = useRef<SavedProject[]>([]);
   savedProjectsRef.current = savedProjects;
 
+  // Refs to track latest values for save operations (avoids stale closure issues)
+  const messagesRef = useRef<Message[]>([]);
+  messagesRef.current = messages;
+  const functionalSpecRef = useRef<string>('');
+  functionalSpecRef.current = functionalSpec;
+  const technicalSpecRef = useRef<string>('');
+  technicalSpecRef.current = technicalSpec;
+  const implementationPlanRef = useRef<string>('');
+  implementationPlanRef.current = implementationPlan;
+  const projectNameRef = useRef<string>('New Project');
+  projectNameRef.current = projectName;
+
   // CRITICAL: Use ref for lock timestamp to avoid stale closure problem
   const myLockTimestampRef = useRef<number | null>(null);
 
@@ -107,7 +119,44 @@ const App: React.FC = () => {
   }, [pendingProjectId, savedProjects]);
 
   // Helper to load project data without triggering URL update loop
-  const loadProjectFromData = (project: SavedProject) => {
+  const loadProjectFromData = async (project: SavedProject) => {
+    // Auto-save current project before switching (if we have lock)
+    if (activeProjectId && myLockTimestampRef.current !== null && fb.db) {
+      console.log('💾 Auto-saving before switching projects...');
+      try {
+        const existingProject = savedProjectsRef.current.find(p => p.id === activeProjectId);
+        const saveData = {
+          id: activeProjectId,
+          projectName: projectNameRef.current,
+          functional: functionalSpecRef.current,
+          technical: technicalSpecRef.current,
+          implementationPlan: implementationPlanRef.current,
+          messages: messagesRef.current,
+          updatedAt: Date.now(),
+          lastEditedBy: user?.displayName || 'Anonymous',
+          lastEditedAvatar: user?.photoURL || null,
+          ownerId: existingProject?.ownerId || user?.uid || 'anonymous',
+          ownerName: existingProject?.ownerName || user?.displayName || 'Anonymous',
+          ownerAvatar: existingProject?.ownerAvatar || user?.photoURL || null,
+          tasks: existingProject?.tasks || [],
+          milestones: existingProject?.milestones || [],
+          timeEntries: existingProject?.timeEntries || [],
+          comments: existingProject?.comments || [],
+          lastTaskExtraction: existingProject?.lastTaskExtraction || null,
+          // Release lock when switching
+          lockedBy: null,
+          lockedByName: null,
+          lockedByAvatar: null,
+          lockedAt: null,
+          lastActivityAt: null
+        };
+        await fb.setDoc(fb.doc(fb.db, "projects", activeProjectId), saveData);
+        console.log('✅ Auto-save successful before switch');
+      } catch (error) {
+        console.error('❌ Auto-save failed before switch:', error);
+      }
+    }
+
     setActiveProjectId(project.id);
     setProjectName(project.projectName);
     setFunctionalSpec(project.functional);
@@ -361,13 +410,14 @@ const App: React.FC = () => {
     // Get current project's PM data to preserve it during saves
     const existingProject = savedProjectsRef.current.find(p => p.id === id);
 
+    // CRITICAL: Read from REFS to get latest values (avoids stale closure bug)
     const newProject = {
       id,
-      projectName,
-      functional: functionalSpec,
-      technical: technicalSpec,
-      implementationPlan,
-      messages,
+      projectName: projectNameRef.current,
+      functional: functionalSpecRef.current,
+      technical: technicalSpecRef.current,
+      implementationPlan: implementationPlanRef.current,
+      messages: messagesRef.current,
       updatedAt: Date.now(),
       lastEditedBy: user?.displayName || 'Anonymous',
       lastEditedAvatar: user?.photoURL || null,
@@ -425,7 +475,7 @@ const App: React.FC = () => {
     } finally {
       setTimeout(() => setSaveStatus('idle'), 2000);
     }
-  }, [activeProjectId, projectName, functionalSpec, technicalSpec, implementationPlan, messages, user]); // Note: myLockTimestamp removed - we read from ref instead
+  }, [activeProjectId, user]); // All content read from refs to avoid stale closure
 
   const loadProject = (project: SavedProject) => {
     loadProjectFromData(project);
@@ -601,13 +651,37 @@ const App: React.FC = () => {
     };
   }, []); // Empty deps = only runs on mount/unmount
 
+  // Save ref for use in event handlers
+  const saveCurrentProjectRef = useRef(saveCurrentProject);
+  saveCurrentProjectRef.current = saveCurrentProject;
+  const activeProjectIdRef = useRef(activeProjectId);
+  activeProjectIdRef.current = activeProjectId;
+
+  // visibilitychange: auto-save when user switches tabs or minimizes (async-safe)
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'hidden' && myLockTimestampRef.current !== null && activeProjectIdRef.current) {
+        console.log('👁️ Page hidden, auto-saving...');
+        try {
+          await saveCurrentProjectRef.current(Date.now());
+          console.log('✅ Auto-save on visibility change successful');
+        } catch (error) {
+          console.error('❌ Auto-save on visibility change failed:', error);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
   // beforeunload: warn and attempt cleanup
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       // Use ref to check current lock state (avoids stale closure)
       if (myLockTimestampRef.current !== null) {
         e.preventDefault();
-        e.returnValue = 'You have an active lock. Are you sure you want to leave?';
+        e.returnValue = 'You have an active lock. Changes will be saved automatically.';
         unlockProjectRef.current(); // Best effort cleanup using ref
       }
     };
@@ -1004,11 +1078,22 @@ const App: React.FC = () => {
     try {
       const response = await geminiService.generateSpec(content, messages, functionalSpec, technicalSpec, implementationPlan, attachment);
       const newProjectName = response.projectName || projectName;
+      const assistantMessage: Message = { role: 'assistant', content: response.chatResponse, timestamp: Date.now() };
+      const updatedMessages = [...newMessages, assistantMessage];
+
+      // Update state
       if (response.projectName) setProjectName(response.projectName);
       setFunctionalSpec(response.functional);
       setTechnicalSpec(response.technical);
       setImplementationPlan(response.implementationPlan);
-      setMessages(prev => [...prev, { role: 'assistant', content: response.chatResponse, timestamp: Date.now() }]);
+      setMessages(updatedMessages);
+
+      // CRITICAL: Update refs IMMEDIATELY before save (state updates are async, refs are sync)
+      projectNameRef.current = newProjectName;
+      functionalSpecRef.current = response.functional;
+      technicalSpecRef.current = response.technical;
+      implementationPlanRef.current = response.implementationPlan;
+      messagesRef.current = updatedMessages;
 
       // For NEW projects, create and auto-lock
       if (isNewProject && fb.db && user) {
@@ -1027,7 +1112,7 @@ const App: React.FC = () => {
           functional: response.functional,
           technical: response.technical,
           implementationPlan: response.implementationPlan,
-          messages: [...newMessages, { role: 'assistant', content: response.chatResponse, timestamp: Date.now() }],
+          messages: updatedMessages,
           updatedAt: Date.now(),
           lastEditedBy: user.displayName || 'Anonymous',
           lastEditedAvatar: user.photoURL || null,
