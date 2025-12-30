@@ -32,21 +32,33 @@ No `src/` folder - core files in root, with `components/` and `services/` subdir
 ### Structure
 ```
 ├── App.tsx              # Main container: auth, project CRUD, Firestore sync, locking, AI orchestration
-├── types.ts             # TypeScript interfaces + TabType enum
+├── types.ts             # TypeScript interfaces (Task, Milestone, TeamMember, etc.) + enums
 ├── constants.ts         # SYSTEM_INSTRUCTION prompt (AI architect behavior)
 ├── components/
 │   ├── ChatPane.tsx     # Chat interface with file attachments
 │   ├── EditorPane.tsx   # Triple-tab editor (Functional/Technical/Implementation Plan)
+│   ├── ProjectPane.tsx  # Kanban board with drag-and-drop task management
+│   ├── TaskDetailPanel.tsx   # Task detail view with assignees, time logs, comments
+│   ├── TaskExtractionModal.tsx # Modal for reviewing AI-extracted tasks before import
+│   ├── AssigneeSelector.tsx  # Team member selector dropdown
+│   ├── TimeLogForm.tsx  # Time entry logging form
+│   ├── CommentThread.tsx # Task comments with threading
+│   ├── MilestoneBar.tsx # Visual milestone progress bar
 │   ├── MermaidRenderer.tsx  # Mermaid diagrams with pan/zoom (Figma-like)
 │   ├── MarkdownRenderer.tsx # Markdown with Mermaid block detection
 │   ├── Avatar.tsx       # User avatar component
 │   └── UserGuide.tsx    # Help modal
 └── services/
-    ├── geminiService.ts # Gemini API client with structured JSON output
+    ├── geminiService.ts # Gemini API client: spec generation + task extraction
     └── firebase.ts      # Firebase init + Firestore/Auth/Storage helpers
 ```
 
 ### Key Design Patterns
+
+#### App Modes
+The app has two modes controlled by `AppMode` type:
+- **Specs Mode** (`specs`): AI-powered requirements generation with chat, editors for functional/technical specs and implementation plans
+- **Project Mode** (`project`): Kanban board for task management with milestones, assignees, time tracking, and comments
 
 #### Project Locking System
 Collaborative editing uses pessimistic locking:
@@ -60,10 +72,19 @@ Collaborative editing uses pessimistic locking:
 #### Gemini API Integration
 - Model: `gemini-3-pro-preview` (via `@google/genai` SDK)
 - Uses structured output with `responseMimeType: "application/json"` and `responseSchema`
-- Response shape: `{ projectName, functional, technical, implementationPlan, chatResponse }`
+- Two API methods in `GeminiService`:
+  - `generateSpec()`: Spec generation → `{ projectName, functional, technical, implementationPlan, chatResponse }`
+  - `extractTasks()`: Parses implementation plan → `{ tasks, milestones, chatResponse }`
 - Role mapping: `user` → `user`, `assistant` → `model`
 - Supports multimodal input (images, PDFs) via `inlineData` with base64 encoding
 - Date context injected into system instruction for accurate Gantt charts
+
+#### Kanban Task Management
+- Tasks have status: `todo` | `in_progress` | `in_review` | `done`
+- Drag-and-drop between columns updates status
+- Tasks can be assigned to team members, have due dates, time estimates, and dependencies
+- Milestones group tasks into phases/sprints
+- AI extracts tasks from implementation plans via `extractTasks()` method
 
 #### Real-time Sync
 - `onSnapshot` listeners for project list and active project
@@ -83,7 +104,7 @@ This is for *generated documentation*, not Draftio itself. The `PESTIO_SPEC` con
 
 ### Firebase
 - Project ID: `draft-io` (config hardcoded in `firebase.ts`)
-- Collection: `projects`
+- Collections: `projects` (main data including tasks/milestones), `users` (team members)
 - Auth: Google Sign-In via `GoogleAuthProvider`
 - `isFirebaseEnabled()` checks if auth/db initialized successfully
 

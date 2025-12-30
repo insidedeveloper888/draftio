@@ -155,6 +155,36 @@ const App: React.FC = () => {
     };
   }, [currentProject, isLockStale]);
 
+  // Countdown timer for lock takeover
+  const [lockCountdown, setLockCountdown] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isLockedByOther || !lockInfo.lastActivityAt) {
+      setLockCountdown(null);
+      return;
+    }
+
+    const updateCountdown = () => {
+      const fifteenMinutes = 15 * 60 * 1000;
+      const elapsed = Date.now() - lockInfo.lastActivityAt!;
+      const remaining = fifteenMinutes - elapsed;
+
+      if (remaining <= 0) {
+        setLockCountdown(null);
+        return;
+      }
+
+      const minutes = Math.floor(remaining / 60000);
+      const seconds = Math.floor((remaining % 60000) / 1000);
+      setLockCountdown(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(interval);
+  }, [isLockedByOther, lockInfo.lastActivityAt]);
+
   const geminiService = useMemo(() => new GeminiService(), []);
 
   // Listen for Auth changes using the correctly exported onAuthStateChanged from local firebase service.
@@ -1309,6 +1339,15 @@ const App: React.FC = () => {
                   <span className="hidden sm:inline">You are in READ ONLY mode - </span>🔒 Locked by {lockInfo.lockedByName}
                 </span>
               </div>
+              {lockCountdown && (
+                <div className="flex items-center gap-1.5 px-2 sm:px-3 py-1 bg-amber-200/60 rounded-full">
+                  <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-amber-700" />
+                  <span className="text-xs sm:text-sm font-mono font-bold text-amber-800">
+                    {lockCountdown}
+                  </span>
+                  <span className="hidden sm:inline text-xs text-amber-700">until takeover</span>
+                </div>
+              )}
             </div>
           )}
 
