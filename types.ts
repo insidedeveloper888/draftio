@@ -24,7 +24,7 @@ export interface SpecificationResponse {
 // Project Management Types
 export type TaskPriority = 'high' | 'medium' | 'low';
 export type TaskStatus = 'todo' | 'in_progress' | 'in_review' | 'done';
-export type AppMode = 'specs' | 'project';
+export type AppMode = 'specs' | 'project' | 'dashboard';
 
 // Team member stored in Firestore users collection
 export interface TeamMember {

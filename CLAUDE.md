@@ -38,6 +38,7 @@ No `src/` folder - core files in root, with `components/` and `services/` subdir
 │   ├── ChatPane.tsx     # Chat interface with file attachments
 │   ├── EditorPane.tsx   # Triple-tab editor (Functional/Technical/Implementation Plan)
 │   ├── ProjectPane.tsx  # Kanban board with drag-and-drop task management
+│   ├── DashboardPane.tsx # Team workload dashboard with stats and task list
 │   ├── TaskDetailPanel.tsx   # Task detail view with assignees, time logs, comments
 │   ├── TaskExtractionModal.tsx # Modal for reviewing AI-extracted tasks before import
 │   ├── AssigneeSelector.tsx  # Team member selector dropdown
@@ -56,9 +57,10 @@ No `src/` folder - core files in root, with `components/` and `services/` subdir
 ### Key Design Patterns
 
 #### App Modes
-The app has two modes controlled by `AppMode` type:
+The app has three modes controlled by `AppMode` type:
 - **Specs Mode** (`specs`): AI-powered requirements generation with chat, editors for functional/technical specs and implementation plans
 - **Project Mode** (`project`): Kanban board for task management with milestones, assignees, time tracking, and comments
+- **Dashboard Mode** (`dashboard`): Team workload manager showing aggregate stats across all projects, team member cards with task/hour metrics, and a filterable task list
 
 #### Project Locking System
 Collaborative editing uses pessimistic locking:

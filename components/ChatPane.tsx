@@ -113,7 +113,7 @@ const ChatPane: React.FC<ChatPaneProps> = ({ messages, onSendMessage, isLoading,
         )}
         
         {messages.map((msg, i) => (
-          <div key={i} className={`flex gap-2 sm:gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+          <div key={i} className={`flex gap-2 sm:gap-3 min-w-0 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
             {msg.role === 'user' ? (
               <Avatar
                 photoURL={msg.photoURL}
@@ -126,8 +126,8 @@ const ChatPane: React.FC<ChatPaneProps> = ({ messages, onSendMessage, isLoading,
                 <Bot className="w-3 h-3 sm:w-4 sm:h-4" />
               </div>
             )}
-            <div className={`flex flex-col gap-1 max-w-[85%] ${msg.role === 'user' ? 'items-end' : ''}`}>
-              <div className={`rounded-2xl px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm shadow-sm ${
+            <div className={`flex flex-col gap-1 max-w-[85%] min-w-0 ${msg.role === 'user' ? 'items-end' : ''}`}>
+              <div className={`rounded-2xl px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm shadow-sm overflow-hidden ${
                 msg.role === 'user'
                   ? 'bg-indigo-600 text-white rounded-tr-none'
                   : 'bg-slate-800 text-slate-200 border border-slate-700/50 rounded-tl-none'
@@ -137,7 +137,9 @@ const ChatPane: React.FC<ChatPaneProps> = ({ messages, onSendMessage, isLoading,
                     <span className="text-[9px] sm:text-[10px] text-slate-400 font-mono uppercase">Attached Content Analyzed</span>
                   </div>
                 )}
-                <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                <div className="whitespace-pre-wrap leading-relaxed break-words overflow-wrap-anywhere max-h-[400px] overflow-y-auto custom-scrollbar">
+                  {msg.content}
+                </div>
               </div>
               {msg.timestamp && (
                 <span className={`text-[9px] text-slate-500 px-1 ${msg.role === 'user' ? 'text-right' : ''}`}>
@@ -224,6 +226,7 @@ const ChatPane: React.FC<ChatPaneProps> = ({ messages, onSendMessage, isLoading,
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
+        .overflow-wrap-anywhere { overflow-wrap: anywhere; word-break: break-word; }
       `}</style>
     </div>
   );
