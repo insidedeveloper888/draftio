@@ -3,12 +3,75 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { SpecificationResponse, Message, Attachment, TaskExtractionResponse, Task, Milestone } from "../types";
 import { SYSTEM_INSTRUCTION } from "../constants";
 
+// Message windowing configuration
+const MESSAGE_WINDOW_SIZE = 20; // Keep last N messages for context
+
 export class GeminiService {
   private ai: GoogleGenAI;
 
   constructor() {
     // Correctly initialize GoogleGenAI using the named parameter 'apiKey' and the 'process.env.API_KEY' string directly.
     this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  }
+
+  /**
+   * Apply windowing to message history to prevent context overflow.
+   * Keeps the most recent messages and provides a summary of older context.
+   */
+  private windowMessages(history: Message[]): {
+    windowedHistory: Message[];
+    olderContextSummary: string | null;
+    totalMessages: number;
+    includedMessages: number;
+  } {
+    const totalMessages = history.length;
+
+    if (totalMessages <= MESSAGE_WINDOW_SIZE) {
+      return {
+        windowedHistory: history,
+        olderContextSummary: null,
+        totalMessages,
+        includedMessages: totalMessages
+      };
+    }
+
+    // Keep only the most recent messages
+    const windowedHistory = history.slice(-MESSAGE_WINDOW_SIZE);
+    const olderMessages = history.slice(0, -MESSAGE_WINDOW_SIZE);
+
+    // Create a summary of older context
+    const olderTopics = this.extractTopicsFromMessages(olderMessages);
+    const olderContextSummary = `[Prior conversation context: ${olderMessages.length} earlier messages discussing: ${olderTopics}. The current document state below reflects all previous work.]`;
+
+    return {
+      windowedHistory,
+      olderContextSummary,
+      totalMessages,
+      includedMessages: MESSAGE_WINDOW_SIZE
+    };
+  }
+
+  /**
+   * Extract key topics from older messages for context summary.
+   */
+  private extractTopicsFromMessages(messages: Message[]): string {
+    // Get unique key phrases from message content (simple extraction)
+    const contentSamples = messages
+      .filter(m => m.role === 'user')
+      .map(m => {
+        // Take first 100 chars of each user message
+        const content = m.content.substring(0, 100);
+        // Extract potential topic phrases
+        return content.replace(/[^\w\s]/g, ' ').trim();
+      })
+      .filter(c => c.length > 10)
+      .slice(0, 5); // Take up to 5 samples
+
+    if (contentSamples.length === 0) {
+      return 'project requirements and specifications';
+    }
+
+    return contentSamples.join('; ').substring(0, 200) + '...';
   }
 
   async generateSpec(
@@ -21,10 +84,27 @@ export class GeminiService {
   ): Promise<SpecificationResponse> {
     const model = 'gemini-3-pro-preview';
 
+    // Apply message windowing to prevent context overflow
+    const { windowedHistory, olderContextSummary, totalMessages, includedMessages } = this.windowMessages(history);
+
+    // Log windowing info for debugging
+    if (olderContextSummary) {
+      console.log(`[GeminiService] Message windowing applied: ${includedMessages}/${totalMessages} messages included`);
+    }
+
+    // Build the prompt with emphasis on document preservation
+    const contextNote = olderContextSummary
+      ? `\n      --- CONVERSATION CONTEXT ---\n      ${olderContextSummary}\n`
+      : '';
+
     const prompt = `
       User Input: "${userInput}"
+${contextNote}
+      --- CURRENT PROJECT STATE (CRITICAL: Preserve all existing content) ---
 
-      --- CURRENT PROJECT STATE ---
+      ⚠️ IMPORTANT: The document content below represents ALL work done so far.
+      You MUST preserve ALL existing sections, diagrams, and content unless explicitly asked to remove something.
+
       Functional Spec Content:
       ${currentFunctional || "[Empty - New Project]"}
 
@@ -41,6 +121,35 @@ export class GeminiService {
       4. Update the 'functional', 'technical', and 'implementationPlan' specifications ONLY with information that is confirmed or highly logical based on the provided data.
       5. The Implementation Plan should outline concrete steps, tasks, dependencies, and milestones for executing the project.
       6. Maintain the professional tone of a Senior Architect.
+
+      --- MANDATORY DIAGRAM REQUIREMENTS ---
+      📊 FUNCTIONAL SPEC MUST INCLUDE A MINDMAP DIAGRAM:
+      - ALWAYS include a Mermaid mindmap at the START of the Functional Spec showing project scope
+      - The mindmap should visualize ALL modules, features, and sub-features
+      - Root node = Project/System name
+      - First level = Major modules (e.g., User Management, Order Processing, Analytics)
+      - Second level = Features within each module
+      - Third level = Sub-features or key capabilities (if applicable)
+
+      Example mindmap structure:
+      \`\`\`mermaid
+      mindmap
+        root((Project Name))
+          Module A
+            Feature 1
+            Feature 2
+              Sub-feature 2.1
+          Module B
+            Feature 3
+            Feature 4
+          Module C
+            Feature 5
+      \`\`\`
+
+      - Update the mindmap whenever new features/modules are discussed
+      - The mindmap helps users understand project size and scope at a glance
+
+      ⚠️ CRITICAL REMINDER: Do NOT remove any existing sections, diagrams, tables, or content from the documents above unless the user explicitly requests removal.
     `;
 
     try {
@@ -67,10 +176,11 @@ CURRENT DATE/TIME CONTEXT:
 `;
       const systemInstructionWithDate = SYSTEM_INSTRUCTION + dateContext;
 
+      // Use windowed history instead of full history
       const response = await this.ai.models.generateContent({
         model,
         contents: [
-          ...history.map(h => ({
+          ...windowedHistory.map(h => ({
             role: h.role === 'user' ? ('user' as const) : ('model' as const),
             parts: h.attachment
               ? [{ text: h.content }, { inlineData: { data: h.attachment.data, mimeType: h.attachment.mimeType } }]
