@@ -1077,12 +1077,18 @@ const App: React.FC = () => {
 
     try {
       const response = await geminiService.generateSpec(content, messages, functionalSpec, technicalSpec, implementationPlan, attachment);
-      const newProjectName = response.projectName || projectName;
       const assistantMessage: Message = { role: 'assistant', content: response.chatResponse, timestamp: Date.now() };
       const updatedMessages = [...newMessages, assistantMessage];
 
+      // Only update project name from AI response if:
+      // 1. It's a new project (no activeProjectId), OR
+      // 2. The current name is still the default "New Project"
+      // This prevents AI from overwriting user's manual title changes
+      const shouldUpdateName = !activeProjectId || projectName === 'New Project';
+      const newProjectName = shouldUpdateName && response.projectName ? response.projectName : projectName;
+
       // Update state
-      if (response.projectName) setProjectName(response.projectName);
+      if (shouldUpdateName && response.projectName) setProjectName(response.projectName);
       setFunctionalSpec(response.functional);
       setTechnicalSpec(response.technical);
       setImplementationPlan(response.implementationPlan);

@@ -80,6 +80,7 @@ Collaborative editing uses pessimistic locking:
 - Role mapping: `user` → `user`, `assistant` → `model`
 - Supports multimodal input (images, PDFs) via `inlineData` with base64 encoding
 - Date context injected into system instruction for accurate Gantt charts
+- Message windowing: keeps last 20 messages (`MESSAGE_WINDOW_SIZE`) to prevent context overflow; older messages summarized into topic hints
 
 #### Kanban Task Management
 - Tasks have status: `todo` | `in_progress` | `in_review` | `done`
@@ -105,7 +106,7 @@ This is for *generated documentation*, not Draftio itself. The `PESTIO_SPEC` con
 ## Implementation Notes
 
 ### Firebase
-- Project ID: `draft-io` (config hardcoded in `firebase.ts`)
+- Full config hardcoded in `firebase.ts` (project ID: `draft-io`)
 - Collections: `projects` (main data including tasks/milestones), `users` (team members)
 - Auth: Google Sign-In via `GoogleAuthProvider`
 - `isFirebaseEnabled()` checks if auth/db initialized successfully

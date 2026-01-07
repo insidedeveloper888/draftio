@@ -44,6 +44,71 @@ const getDiagramInfo = (chart: string): { type: string; icon: React.ReactNode; c
   return { type: 'Diagram', icon: <Map className="w-3.5 h-3.5" />, color: 'bg-slate-100 text-slate-700 border-slate-200', isWide: false };
 };
 
+/**
+ * Sanitize mermaid chart code to handle special characters like parentheses.
+ * Mermaid uses () for node shapes, so literal parentheses in text can break rendering.
+ */
+const sanitizeMermaidChart = (chart: string): string => {
+  // Split into lines for processing
+  const lines = chart.split('\n');
+
+  return lines.map(line => {
+    // Skip directive lines, empty lines, and lines that are just diagram type declarations
+    const trimmed = line.trim();
+    if (!trimmed ||
+        trimmed.startsWith('%%') ||
+        trimmed.startsWith('graph') ||
+        trimmed.startsWith('flowchart') ||
+        trimmed.startsWith('sequenceDiagram') ||
+        trimmed.startsWith('classDiagram') ||
+        trimmed.startsWith('stateDiagram') ||
+        trimmed.startsWith('erDiagram') ||
+        trimmed.startsWith('journey') ||
+        trimmed.startsWith('gantt') ||
+        trimmed.startsWith('pie') ||
+        trimmed.startsWith('mindmap') ||
+        trimmed.startsWith('timeline') ||
+        trimmed.startsWith('gitGraph') ||
+        trimmed.startsWith('section') ||
+        trimmed.startsWith('title') ||
+        trimmed.startsWith('dateFormat') ||
+        trimmed.startsWith('axisFormat') ||
+        trimmed.startsWith('excludes') ||
+        trimmed.startsWith('todayMarker')) {
+      return line;
+    }
+
+    // For mindmap nodes, replace problematic parentheses with alternatives
+    // Mindmap syntax: root((text)) or just text on indented lines
+    // We need to be careful not to break the (( )) syntax for root nodes
+
+    // Check if line contains text with parentheses that aren't part of node shape syntax
+    // Node shapes: ((text)), (text), [text], {text}
+    // We want to replace standalone ( ) in text content with similar-looking characters
+
+    // Replace English parentheses with full-width versions in text content
+    // but preserve Mermaid syntax parentheses
+    let result = line;
+
+    // For mindmap: handle root((text)) - the double parens are intentional
+    // We only want to escape parentheses that are INSIDE the text
+
+    // Match text content between quotes or after node definitions
+    // Replace ( with ❨ and ) with ❩ (or use fullwidth versions（）)
+    result = result.replace(/\(([^()]*)\(([^)]+)\)([^()]*)\)/g, (match, before, inner, after) => {
+      // This is likely a nested paren situation - escape the inner ones
+      return `(${before}❨${inner}❩${after})`;
+    });
+
+    // For simple cases where we have text(something) pattern that's not a node definition
+    // Look for patterns like "Feature (Beta)" where parens are inside text
+    // Replace loose parentheses that appear after text (not at line start for nodes)
+    result = result.replace(/(\w+)\s+\(([^)]+)\)/g, '$1 ❨$2❩');
+
+    return result;
+  }).join('\n');
+};
+
 const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
   const ref = useRef<HTMLDivElement>(null);
   const fullscreenRef = useRef<HTMLDivElement>(null);
@@ -62,7 +127,9 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
   const dragStartRef = useRef({ x: 0, y: 0 });
   const panStartRef = useRef({ x: 0, y: 0 });
 
-  const diagramInfo = getDiagramInfo(chart);
+  // Sanitize chart to handle special characters
+  const sanitizedChart = sanitizeMermaidChart(chart);
+  const diagramInfo = getDiagramInfo(sanitizedChart);
 
   const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.25, 10));
   const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.25, 0.25));
@@ -110,13 +177,13 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
 
   useEffect(() => {
     const renderChart = async () => {
-      if (ref.current && chart && (window as any).mermaid) {
+      if (ref.current && sanitizedChart && (window as any).mermaid) {
         setIsLoading(true);
         setHasError(false);
         try {
           ref.current.innerHTML = '';
           const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
-          const { svg } = await (window as any).mermaid.render(id, chart);
+          const { svg } = await (window as any).mermaid.render(id, sanitizedChart);
           ref.current.innerHTML = svg;
           setSvgContent(svg);
           setIsLoading(false);
@@ -130,7 +197,7 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
     };
 
     renderChart();
-  }, [chart]);
+  }, [sanitizedChart]);
 
   // Update fullscreen content when it opens and calculate fit zoom
   useEffect(() => {
